@@ -1,0 +1,33 @@
+# Nieuwe databasewijzigingen (supabase/migrations/*.sql) automatisch uitvoeren.
+# Elk bestand draait één keer, in één transactie; de lijst met uitgevoerde bestanden staat in meta.migrations.
+# De eerste twee bestanden zijn met de hand in de SQL Editor uitgevoerd en worden als 'al gedaan' gemarkeerd.
+name: Database bijwerken
+on:
+  push:
+    branches: [main]
+    paths: ["supabase/migrations/**"]
+  workflow_dispatch:
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: psql installeren
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Wijzigingen uitvoeren
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          psql "$DB" -v ON_ERROR_STOP=1 -q -c "create schema if not exists meta; create table if not exists meta.migrations (name text primary key, applied_at timestamptz not null default now()); revoke all on schema meta from public, anon, authenticated;"
+          psql "$DB" -v ON_ERROR_STOP=1 -q -c "insert into meta.migrations (name) values ('20261018000000_init.sql'), ('20261018000100_storage.sql') on conflict do nothing;"
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            n=$(basename "$f")
+            done_already=$(psql "$DB" -tA -c "select count(*) from meta.migrations where name = '$n'")
+            if [ "$done_already" = "0" ]; then
+              echo "Uitvoeren: $n"
+              psql "$DB" -v ON_ERROR_STOP=1 -1 -q -f "$f" -c "insert into meta.migrations (name) values ('$n');"
+            else
+              echo "Al gedaan: $n"
+            fi
+          done
