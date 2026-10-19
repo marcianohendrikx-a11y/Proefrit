@@ -1,0 +1,5 @@
+web/config.js
+node_modules/
+.env
+*.local
+__pycache__/

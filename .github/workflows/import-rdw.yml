@@ -1,0 +1,32 @@
+# Haalt elke maand alle personenauto-modellen op bij de RDW (open data, CC0) en werkt de catalogus bij.
+# Eenmalig instellen in GitHub > Settings > Secrets and variables > Actions:
+#   SUPABASE_DB_URL  Supabase > Project Settings > Database > Connection string (URI), met je databasewachtwoord erin
+#   RDW_APP_TOKEN    optioneel, een gratis app-token van opendata.rdw.nl voor hogere limieten
+# Handmatig starten: tabblad Actions > "RDW-catalogus bijwerken" > Run workflow.
+name: RDW-catalogus bijwerken
+on:
+  schedule:
+    - cron: "17 3 2 * *"   # de 2e van elke maand, 03:17 UTC
+  workflow_dispatch:
+    inputs:
+      min_vehicles:
+        description: "Nieuwe modellen vanaf dit aantal voertuigen"
+        default: "50"
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: RDW ophalen en SQL maken
+        env:
+          RDW_APP_TOKEN: ${{ secrets.RDW_APP_TOKEN }}
+          MIN_VEHICLES: ${{ github.event.inputs.min_vehicles || '50' }}
+        run: node scripts/import-rdw.mjs rdw_models.sql
+      - name: In de database zetten
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -f rdw_models.sql
