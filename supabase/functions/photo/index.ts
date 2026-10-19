@@ -6,7 +6,7 @@
 //     controleert opnieuw (geen leesbaar kenteken, geen personen). Pas dan bewaren we hem in de
 //     privé-map 'submissions' met status 'pending', tot een beheerder hem goedkeurt.
 import { admin, b64ToBytes, cors, currentUser, json, sha256hex } from "../_shared/common.ts";
-import { checkCarPhoto, photoVerdict } from "../_shared/photo.ts";
+import { checkCarPhoto, lastClaudeIssue, photoVerdict } from "../_shared/photo.ts";
 
 const TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_BYTES = 2_500_000, MAX_PENDING = 10, MAX_PER_HOUR = 20;
@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     const chk = await checkCarPhoto(image, type, carName, w, h, false);
     const v = photoVerdict(chk, carName, false);
     if (v.reject) return json({ reject: v.reject });
-    return json({ auto: v.auto, ok: v.ok, notes: v.notes, plates: chk?.plates ?? [] });
+    return json({ auto: v.auto, ok: v.ok, notes: v.notes, plates: chk?.plates ?? [], ...(chk ? {} : { diag: lastClaudeIssue }) });
   }
 
   // submit

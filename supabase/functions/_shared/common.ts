@@ -162,7 +162,7 @@ export async function readPlatePhoto(b64: string, mediaType: string) {
       ] }],
     }),
   });
-  if (!res.ok) return { status: "error" as const };
+  if (!res.ok) { console.error("Claude-aanroep (kenteken) mislukt:", res.status, await res.text().then((t) => t.slice(0, 200)).catch(() => "")); return { status: "error" as const }; }
   const data = await res.json();
   const text = (data.content ?? []).map((c: { type: string; text?: string }) => (c.type === "text" ? c.text ?? "" : "")).join("");
   const m = text.match(/\{[\s\S]*\}/);
