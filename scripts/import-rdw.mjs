@@ -58,7 +58,8 @@ const rows = (await load())
   .map((r) => ({ brand: clean(r.merk), trade: clean(r.handelsbenaming), first: year(r.eerste), last: year(r.laatste), n: Number(r.aantal) || 0 }))
   .filter((r) => r.brand && r.trade && r.n > 0);
 
-let sql = `-- RDW-modelnamen voor personenauto's (RDW Open Data, CC0). Gegenereerd door scripts/import-rdw.mjs op ${new Date().toISOString().slice(0, 10)}.
+let sql = `set statement_timeout = 0;
+-- RDW-modelnamen voor personenauto's (RDW Open Data, CC0). Gegenereerd door scripts/import-rdw.mjs op ${new Date().toISOString().slice(0, 10)}.
 -- ${rows.length} combinaties van merk en handelsbenaming. Nieuwe modellen vanaf ${MIN} voertuigen.
 begin;
 create temp table rdw_in (brand text, trade_name text, first_year int, last_year int, vehicles int) on commit drop;
@@ -74,39 +75,48 @@ on conflict (brand, trade_name) do update set first_year = excluded.first_year, 
   vehicles = excluded.vehicles, updated_at = now();
 
 -- 2. Voorstel: het langste model uit de catalogus waarmee de RDW-naam begint (ook met het merk ervoor),
---    of 'C 200' -> 'C-Klasse'.
+--    of 'C 200' -> 'C-Klasse'. Namen worden één keer genormaliseerd en per merk vergeleken (snel, ook bij 100.000 namen).
+create temp table rn on commit drop as
+  select brand, trade_name, public.norm_name(brand) nb, public.norm_name(trade_name) nt,
+         lower(substring(trade_name from '^([A-Za-z]{1,3}) ?[0-9]')) || ' klasse' as kl
+  from public.rdw_models where match <> 'zeker';
+create temp table cn on commit drop as
+  select id, brand, model, public.norm_name(brand) nb, public.norm_name(model) nm from public.cars where source = 'catalogus';
+create index on rn (nb);
+create index on cn (nb);
+analyze rn; analyze cn;
 with m as (
-  select distinct on (r.brand, r.trade_name) r.brand, r.trade_name, c.id
-  from public.rdw_models r join public.cars c on public.norm_name(c.brand) = public.norm_name(r.brand)
-  where r.match <> 'zeker' and c.source = 'catalogus' and (
-        public.norm_name(r.trade_name) = public.norm_name(c.model)
-     or public.norm_name(r.trade_name) like public.norm_name(c.model) || ' %'
-     or public.norm_name(r.trade_name) = public.norm_name(c.brand) || ' ' || public.norm_name(c.model)
-     or public.norm_name(r.trade_name) like public.norm_name(c.brand) || ' ' || public.norm_name(c.model) || ' %'
-     or public.norm_name(c.model) = lower(substring(r.trade_name from '^([A-Za-z]{1,3}) ?[0-9]')) || ' klasse')
-  order by r.brand, r.trade_name, length(c.model) desc)
+  select distinct on (rn.brand, rn.trade_name) rn.brand, rn.trade_name, cn.id
+  from rn join cn on cn.nb = rn.nb
+  where rn.nt = cn.nm or rn.nt like cn.nm || ' %' or rn.nt = cn.nb || ' ' || cn.nm
+     or rn.nt like cn.nb || ' ' || cn.nm || ' %' or cn.nm = rn.kl
+  order by rn.brand, rn.trade_name, length(cn.model) desc)
 update public.rdw_models r set car_id = m.id, match = 'voorstel' from m
 where r.brand = m.brand and r.trade_name = m.trade_name and r.car_id is distinct from m.id;
 
 -- 3. Nieuwe modellen voor RDW-namen zonder voorstel, met genoeg voertuigen. Bestaat het merk al,
 --    dan krijgt het model diens schrijfwijze; anders hoofdletters zoals initcap ze zet.
-with nieuw as (
+create temp table bm on commit drop as
+  select distinct on (public.norm_name(brand)) public.norm_name(brand) nb, brand from public.cars
+  order by public.norm_name(brand), (source = 'catalogus') desc, brand;
+create temp table nieuw on commit drop as
   select r.brand, r.trade_name, r.first_year, r.last_year,
-         coalesce((select c.brand from public.cars c where public.norm_name(c.brand) = public.norm_name(r.brand) limit 1), initcap(r.brand)) as nice_brand
-  from public.rdw_models r
-  where r.car_id is null and r.vehicles >= ${MIN} and r.first_year is not null),
-ins as (
+         coalesce(bm.brand, initcap(r.brand)) || '|' || initcap(r.trade_name) as car_id,
+         coalesce(bm.brand, initcap(r.brand)) as nice_brand
+  from public.rdw_models r left join bm on bm.nb = public.norm_name(r.brand)
+  where r.car_id is null and r.vehicles >= ${MIN} and r.first_year is not null;
+with ins as (
   insert into public.cars (id, brand, model, year_from, year_to, body, fuels, source)
-  select n.nice_brand || '|' || initcap(n.trade_name), n.nice_brand, initcap(n.trade_name), n.first_year,
-         case when n.last_year >= extract(year from now())::int - 1 then extract(year from now())::int else n.last_year end,
+  select distinct on (n.car_id) n.car_id, n.nice_brand, initcap(n.trade_name), n.first_year,
+         case when n.last_year >= extract(year from now())::int - 1 then extract(year from now())::int else coalesce(n.last_year, n.first_year) end,
          'H', '{}', 'rdw'
-  from nieuw n
+  from nieuw n order by n.car_id
   on conflict (id) do nothing
   returning id)
 select count(*) as nieuwe_modellen from ins;
-update public.rdw_models r set car_id = c.id, match = 'voorstel'
-from public.cars c
-where r.car_id is null and c.source = 'rdw' and c.id = coalesce((select c2.brand from public.cars c2 where public.norm_name(c2.brand) = public.norm_name(r.brand) limit 1), initcap(r.brand)) || '|' || initcap(r.trade_name);
+update public.rdw_models r set car_id = n.car_id, match = 'voorstel'
+from nieuw n join public.cars c on c.id = n.car_id
+where r.brand = n.brand and r.trade_name = n.trade_name and r.car_id is null;
 commit;
 `;
 fs.writeFileSync(OUT, sql);
