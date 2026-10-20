@@ -509,25 +509,70 @@ function garageHtmlLive(p,own,name){
 }
 function garageOrderHtml(p){
   const o=gOrder(p);
-  return `<details class="gorder"${gOrderOpen?' open':''}><summary>Volgorde aanpassen</summary><ol>${o.map((k,i)=>`<li><span>${GGROUPS[k][1]}</span><span class="gbtns"><button type="button" class="ghost sm" data-act="gord" data-k="${k}" data-d="-1" ${i===0?'disabled':''} aria-label="${GGROUPS[k][1]} omhoog">↑</button><button type="button" class="ghost sm" data-act="gord" data-k="${k}" data-d="1" ${i===o.length-1?'disabled':''} aria-label="${GGROUPS[k][1]} omlaag">↓</button></span></li>`).join('')}</ol>
-    <div class="row"><button type="button" class="plain" data-act="gordreset">Standaardvolgorde</button><small class="meta">Zo zien anderen je garage ook.</small></div></details>`;
+  return `<details class="gorder"${gOrderOpen?' open':''}><summary>Volgorde aanpassen</summary><p class="hint" style="margin:6px 0 0">Sleep de groepen in de volgorde die jij wilt. Zo zien anderen je garage ook.</p><ol id="gorder-list">${o.map(k=>`<li data-key="${k}">${gripBtn(GGROUPS[k][1])}<span>${GGROUPS[k][1]}</span></li>`).join('')}</ol>
+    <button type="button" class="plain" data-act="gordreset">Terug naar de standaardvolgorde</button></details>`;
 }
+function bindGarageOrder(){makeSortable($('gorder-list'),order=>saveGarageOrder(order))}
 async function saveGarageOrder(order){
   const p=profileOf(me());const prev=p.garageOrder;
-  store.profiles[me()].garageOrder=order;gOrderOpen=true;render();
+  store.profiles[me()].garageOrder=order;gOrderOpen=true;render();bindGarageOrder();
   try{const rows=await rest('PATCH','profiles?id=eq.'+sbUid(),{garage_order:order},'return=representation');LV.myRow=rows[0]}
   catch(e){store.profiles[me()].garageOrder=prev;render();toast('Opslaan lukte niet: '+e.message)}
 }
-function moveGroup(k,d){const o=gOrder(profileOf(me())),i=o.indexOf(k),j=i+d;if(i<0||j<0||j>=o.length)return;[o[i],o[j]]=[o[j],o[i]];saveGarageOrder(o)}
-/* Auto binnen dezelfde groep een plek omhoog of omlaag (in Garage beheren) */
-async function moveGarageItem(gid,d){
-  const g=ob.draft.garage,it=g.find(x=>x.id===gid);if(!it)return;
-  const same=g.filter(x=>x.status===it.status),i=same.indexOf(it),j=i+d;if(j<0||j>=same.length)return;
-  [same[i],same[j]]=[same[j],same[i]];
-  const order=['nu','gehad','droom'].flatMap(st=>st===it.status?same:g.filter(x=>x.status===st));
-  order.forEach((x,n)=>x.pos=n);ob.draft.garage=order;saveProfile(me(),{garage:order});
-  $('ob-glist').innerHTML=garageEditList(ob.draft);
-  try{await Promise.all(same.map(x=>rest('PATCH','garage_items?id=eq.'+encodeURIComponent(x.id),{position:x.pos})))}
-  catch(e){$('ga-err').textContent='Volgorde opslaan lukte niet: '+e.message}
+/* Garage beheren: per groep een lijst waarin je de auto's versleept */
+function garageEditListLive(d){
+  if(!d.garage.length)return '<p class="meta" style="margin:0">Nog geen auto’s in je garage.</p>';
+  return ['nu','gehad','droom'].map(st=>{const l=d.garage.filter(g=>g.status===st);if(!l.length)return '';
+    return `<div class="gedit"><h4>${GSTATUS[st]}${l.length>1?' <small>sleep om de volgorde te veranderen</small>':''}</h4><div class="stack gsort" data-status="${st}" style="gap:8px">${l.map(g=>{const c=carById(g.car);if(!c)return '';
+      return `<div class="gitem" data-key="${esc(g.id)}">${l.length>1?gripBtn(carName(c)):''}${carSvg(c,'mini')}<div class="gi"><div class="gt">${emblem(c.brand,'sm')}<b>${esc(carName(c))}</b></div><small>${esc(fuelLabel(g.fuel||c.fuels[0]))}${g.year?' · '+esc(g.year):''}</small>${g.vp?'<span class="stamp ok">✓ Kenteken klopt</span>':''}</div><button type="button" class="x" data-act="gdel" data-gid="${esc(g.id)}" aria-label="${esc(carName(c))} verwijderen">×</button></div>`}).join('')}</div></div>`}).join('');
+}
+function bindGarageEdit(){
+  document.querySelectorAll('#ob-glist .gsort').forEach(el=>makeSortable(el,async ids=>{
+    const g=ob.draft.garage,st=el.dataset.status,same=ids.map(id=>g.find(x=>x.id===id)).filter(Boolean);
+    const order=['nu','gehad','droom'].flatMap(s2=>s2===st?same:g.filter(x=>x.status===s2));
+    order.forEach((x,n)=>x.pos=n);ob.draft.garage=order;saveProfile(me(),{garage:order});
+    try{await Promise.all(same.map(x=>rest('PATCH','garage_items?id=eq.'+encodeURIComponent(x.id),{position:x.pos})))}
+    catch(e){$('ga-err').textContent='Volgorde opslaan lukte niet: '+e.message}
+  }));
 }
 document.addEventListener('toggle',e=>{if(e.target&&e.target.classList&&e.target.classList.contains('gorder'))gOrderOpen=e.target.open},true);
+
+/* ---------- Slepen om de volgorde te veranderen (muis, touch en toetsenbord) ----------
+   Pak een item aan het handvat (⠿) en sleep het. Met het toetsenbord: focus op het handvat en gebruik ↑ en ↓. */
+const GRIP='<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="5.5" cy="3.5" r="1.4"/><circle cx="10.5" cy="3.5" r="1.4"/><circle cx="5.5" cy="8" r="1.4"/><circle cx="10.5" cy="8" r="1.4"/><circle cx="5.5" cy="12.5" r="1.4"/><circle cx="10.5" cy="12.5" r="1.4"/></svg>';
+const gripBtn=label=>`<button type="button" class="grip" aria-label="${esc(label)} verplaatsen: sleep, of gebruik de pijltjestoetsen">${GRIP}</button>`;
+function makeSortable(list,onDrop){
+  if(!list||list.dataset.sortable)return;list.dataset.sortable='1';
+  const items=()=>[...list.children].filter(el=>el.dataset.key);
+  const done=()=>onDrop(items().map(el=>el.dataset.key));
+  list.addEventListener('keydown',e=>{
+    const g=e.target.closest('.grip');if(!g||(e.key!=='ArrowUp'&&e.key!=='ArrowDown'))return;
+    e.preventDefault();const it=g.closest('[data-key]'),l=items(),i=l.indexOf(it),j=i+(e.key==='ArrowUp'?-1:1);
+    if(j<0||j>=l.length)return;
+    if(e.key==='ArrowUp')list.insertBefore(it,l[j]);else list.insertBefore(it,l[j].nextSibling);
+    g.focus();done();
+  });
+  list.addEventListener('pointerdown',e=>{
+    const g=e.target.closest('.grip');if(!g||e.button>0)return;
+    const it=g.closest('[data-key]');if(!it)return;
+    e.preventDefault();
+    const r=it.getBoundingClientRect(),dy=e.clientY-r.top,start=items().map(x=>x.dataset.key).join();
+    const ph=document.createElement(it.tagName);ph.className='sortph';ph.style.height=r.height+'px';
+    it.after(ph);
+    Object.assign(it.style,{position:'fixed',left:r.left+'px',top:r.top+'px',width:r.width+'px',zIndex:60,pointerEvents:'none'});
+    it.classList.add('dragging');
+    const move=ev=>{
+      it.style.top=(ev.clientY-dy)+'px';
+      if(ev.clientY>innerHeight-100)scrollBy(0,14);else if(ev.clientY<90)scrollBy(0,-14);   // meeschuiven bij de rand
+      const others=items().filter(x=>x!==it);let before=null;
+      for(const o of others){const b=o.getBoundingClientRect();if(ev.clientY<b.top+b.height/2){before=o;break}}
+      if(before)list.insertBefore(ph,before);else list.appendChild(ph);
+    };
+    const up=()=>{
+      document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);document.removeEventListener('pointercancel',up);
+      ph.replaceWith(it);it.removeAttribute('style');it.classList.remove('dragging');
+      if(items().map(x=>x.dataset.key).join()!==start)done();
+    };
+    document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);document.addEventListener('pointercancel',up);
+  });
+}
