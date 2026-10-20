@@ -48,7 +48,7 @@ export async function checkCarPhoto(b64: string, mediaType: string, car: string,
     method: "POST",
     headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
-      model, max_tokens: 500,
+      model, max_tokens: 1000,
       messages: [{ role: "user", content: [
         { type: "image", source: { type: "base64", media_type: mediaType, data: b64.replace(/^data:[^,]+,/, "") } },
         { type: "text", text: prompt(car, w, h, afterBlur) },
@@ -60,9 +60,9 @@ export async function checkCarPhoto(b64: string, mediaType: string, car: string,
   const data = await res.json();
   const text = (data.content ?? []).map((c: { type: string; text?: string }) => (c.type === "text" ? c.text ?? "" : "")).join("");
   const m = text.match(/\{[\s\S]*\}/);
-  if (!m) return null;
+  if (!m) { lastClaudeIssue = `geen_json_${data.stop_reason ?? "?"}`; console.error("Claude gaf geen JSON:", data.stop_reason, text.slice(0, 300)); return null; }
   let o: Record<string, unknown>;
-  try { o = JSON.parse(m[0]); } catch { return null; }
+  try { o = JSON.parse(m[0]); } catch { lastClaudeIssue = `ongeldige_json_${data.stop_reason ?? "?"}`; console.error("Claude gaf ongeldige JSON:", data.stop_reason, text.slice(0, 300)); return null; }
   const raw = (Array.isArray(o.plates) ? o.plates : []).slice(0, 6) as Record<string, unknown>[];
   let boxes = raw.filter((b) => b && ["x", "y", "w", "h"].every((k) => typeof b[k] === "number" && isFinite(b[k] as number) && (b[k] as number) >= 0))
     .map((b) => ({ x: b.x as number, y: b.y as number, w: b.w as number, h: b.h as number }));
