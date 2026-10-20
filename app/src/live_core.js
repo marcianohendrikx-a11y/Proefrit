@@ -576,3 +576,36 @@ function makeSortable(list,onDrop){
     document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);document.addEventListener('pointercancel',up);
   });
 }
+
+/* ---------- Aan de slag: vriendelijke checklist in plaats van een percentage ---------- */
+function startList(name){
+  const p=profileOf(name),n=reviewsOf(name).length;
+  const steps=[
+    ['Plaats je eerste check-in',n>0,'new','Ik heb gereden'],
+    ['Zet een auto in je garage',p.garage.length>0,'editgarage','Auto toevoegen'],
+    ['Kies een profielfoto',!!p.avatar,'editprofile','Foto kiezen'],
+    ['Vertel iets over jezelf in je bio',!!p.bio,'editprofile2','Bio schrijven'],
+    ['Kies waar je van houdt',p.interests.length>0,'editprofile2','Interesses kiezen']
+  ];
+  const done=steps.filter(s=>s[1]).length;
+  if(done===steps.length)return '';
+  return `<div class="startlist"><div class="row" style="justify-content:space-between;align-items:baseline"><b>Aan de slag</b><small class="meta">${done} van ${steps.length} gedaan</small></div>
+    <ul>${steps.map(([t,ok,act,btn])=>`<li class="${ok?'ok':''}"><span class="ck" aria-hidden="true">${ok?'✓':''}</span><span class="st">${t}<span class="vh">${ok?' (gedaan)':''}</span></span>${ok?'':`<button type="button" class="plain" data-act="${act}">${btn}</button>`}</li>`).join('')}</ul></div>`;
+}
+
+/* ---------- Auto's zoeken: eerst ontdekken, de volledige lijst pas na een zoekterm of filter ---------- */
+function discoverHtml(){
+  const rv=all(),seen=new Set(),recent=[];
+  rv.forEach(r=>{if(!seen.has(r.car)&&carById(r.car)){seen.add(r.car);recent.push(r.car)}});
+  const cnt={};rv.forEach(r=>cnt[r.car]=(cnt[r.car]||0)+1);
+  const most=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(x=>x[0]).filter(id=>carById(id)).slice(0,6);
+  const row=id=>{const c=carById(id),s=agg(rv.filter(r=>r.car===id));return `<button class="carrow" data-act="car" data-car="${esc(c.id)}">${emblem(c.brand)}
+    <span class="ct"><span class="t">${esc(carName(c))}</span><span class="m">${years(c)} · ${BODY_NAME[bodyOf(c)]}</span></span>
+    <span class="r"><span class="n">${s.n} ${s.n===1?'check-in':'check-ins'}</span>${plate(s.avg)}</span></button>`};
+  let h='';
+  if(recent.length)h+=`<h3 class="dh">Onlangs beoordeeld</h3>${recent.slice(0,6).map(row).join('')}`;
+  if(most.length>2)h+=`<h3 class="dh">Meest beoordeeld</h3>${most.map(row).join('')}`;
+  if(!recent.length)h+=`<div class="empty">Er zijn nog geen auto’s beoordeeld. Zoek de auto die jij onlangs reed en wees de eerste.</div>`;
+  h+=`<div class="allcars"><p>Zoek hierboven op merk of model, kies een merk, of bekijk alle ${CARS.length.toLocaleString('nl-NL')} modellen.</p><button class="ghost sm" data-act="showall">Alle modellen tonen</button></div>`;
+  return h;
+}
