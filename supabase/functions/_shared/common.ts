@@ -123,13 +123,40 @@ const wordPrefix = (a: string, b: string) => a === b || a.startsWith(b + " ") ||
 /** Vergelijkt een RDW-record met de gekozen auto. Het model is 'onzeker' als we de
  *  handelsbenaming niet zeker kunnen koppelen (bijv. 'C 200' bij 'C-Klasse'): dan geen
  *  afwijzing, maar ook geen verificatie. Een koppeltabel uit de RDW-data maakt dit later exact. */
-export function compareRdw(rec: RdwRecord, car: CarRow, fuel: string) {
-  const brand = lc(rec.merk) === lc(car.brand) || lc(rec.merk).replace(/ /g, "") === lc(car.brand).replace(/ /g, "");
+// RDW-merknamen die in onze catalogus anders heten (zelfde lijst als in scripts/import-rdw.mjs).
+const BRAND_ALIAS: Record<string, string> = {
+  "bmw i": "bmw", "bmw alpina": "alpina", "mercedes amg": "mercedes benz", "daimler benz": "mercedes benz", "tesla motors": "tesla",
+  "jaguar cars": "jaguar", "de lorean": "delorean", "g m c": "gmc", "n s u": "nsu", "ds automobiles": "ds",
+  "automobili lamborghini s": "lamborghini", "automobili lamborghini": "lamborghini", "micro compact car": "smart",
+  "micro compact car smart": "smart", "mcc": "smart", "lada vaz": "lada", "vaz": "lada", "kg mobility": "ssangyong",
+  "lucid motors": "lucid", "vw": "volkswagen", "alpine renault": "alpine", "rolls royce motor cars": "rolls royce",
+  "aston martin lagonda": "aston martin", "great wall motor": "great wall", "landrover": "land rover",
+  "ineos automotive": "ineos", "polestar automotive": "polestar",
+};
+/** Naam zoals de RDW hem noemt, zonder het merk dubbel ('RAM RAM 1500' wordt 'RAM 1500'). */
+export const rdwName = (rec: { merk: string; handelsbenaming: string }) =>
+  lc(rec.handelsbenaming).startsWith(lc(rec.merk) + " ") || lc(rec.handelsbenaming) === lc(rec.merk) ? rec.handelsbenaming : `${rec.merk} ${rec.handelsbenaming}`;
+
+/** Koppeling uit de RDW-import: bij welk model in onze catalogus hoort deze merk + handelsbenaming? */
+export async function mappedCar(db: ReturnType<typeof admin>, rec: { merk: string; handelsbenaming: string }): Promise<string | null> {
+  const { data } = await db.from("rdw_models").select("car_id").eq("brand", rec.merk).eq("trade_name", rec.handelsbenaming).maybeSingle();
+  return (data?.car_id as string | null) ?? null;
+}
+const brandKey = (s: string) => { const k = lc(s); return BRAND_ALIAS[k] ?? k; };
+
+/** Vergelijkt een RDW-record met de gekozen auto. Het model is 'onzeker' als we de
+ *  handelsbenaming niet zeker kunnen koppelen (bijv. 'C 200' bij 'C-Klasse'): dan geen
+ *  afwijzing, maar ook geen verificatie. mappedCarId = koppeling uit de RDW-import (rdw_models). */
+export function compareRdw(rec: RdwRecord, car: CarRow, fuel: string, mappedCarId?: string | null) {
+  const rb = brandKey(rec.merk), cb = brandKey(car.brand);
   let hb = lc(rec.handelsbenaming);
-  const bl = lc(car.brand);
-  if (hb.startsWith(bl + " ")) hb = hb.slice(bl.length + 1);
-  const cm = lc(car.model);
-  let model: "ja" | "onzeker" = wordPrefix(hb, cm) || hb.split(" ")[0] === cm.split(" ")[0] ? "ja" : "onzeker";
+  let cm = lc(car.model);
+  // Dodge Ram (tot 2010) en het merk RAM (vanaf 2011) zijn dezelfde pick-ups.
+  const ramFamily = (rb === "ram" && cb === "dodge" && cm.startsWith("ram")) || (rb === "dodge" && cb === "ram" && hb.startsWith("ram"));
+  const brand = rb === cb || rb.replace(/ /g, "") === cb.replace(/ /g, "") || ramFamily || (!!mappedCarId && mappedCarId === car.id);
+  for (const b of [lc(rec.merk), rb, cb]) if (b && hb.startsWith(b + " ")) hb = hb.slice(b.length + 1);
+  if (ramFamily) { hb = hb.replace(/^ram /, ""); cm = cm.replace(/^ram /, ""); }
+  let model: "ja" | "onzeker" = mappedCarId === car.id || wordPrefix(hb, cm) || hb.split(" ")[0] === cm.split(" ")[0] ? "ja" : "onzeker";
   const mb = hb.match(/^([a-z]{1,3}) ?\d/);
   if (model === "onzeker" && mb && cm === `${mb[1]} klasse`) model = "ja";
   const fuelOk = allowedFuels(rec.brandstoffen).has(fuel);
@@ -198,13 +225,13 @@ export async function verifyProof(
         const rec = await rdwLookup(pn.key);
         if (!rec) out.soft.push("Dit kenteken is niet gevonden bij de RDW.");
         else {
-          const c = compareRdw(rec, car, fuel);
+          const c = compareRdw(rec, car, fuel, await mappedCar(db, rec));
           const fuels = rec.brandstoffen.join(" + ").toLowerCase();
-          if (!c.brand) out.hard.push(`Dit kenteken staat bij de RDW op een ${rec.merk} ${rec.handelsbenaming}, niet op een ${car.brand} ${car.model}.`);
+          if (!c.brand) out.hard.push(`Dit kenteken staat bij de RDW op een ${rdwName(rec)}, niet op een ${car.brand} ${car.model}.`);
           else if (!c.fuel) out.hard.push(fuel === "LPG-ombouw" ? `Volgens de RDW heeft deze auto geen LPG-installatie (alleen ${fuels}).` : `Dit kenteken staat bij de RDW op ${fuels}, maar je koos ${fuel.toLowerCase()}.`);
-          else if (c.model === "onzeker") out.soft.push(`De RDW noemt dit een ${rec.merk} ${rec.handelsbenaming}. We konden dat niet zeker aan de ${car.model} koppelen, dus het kenteken telt nog niet als bewijs.`);
+          else if (c.model === "onzeker") out.soft.push(`De RDW noemt dit een ${rdwName(rec)}. We konden dat niet zeker aan de ${car.model} koppelen, dus het kenteken telt nog niet als bewijs.`);
           else if (!c.year) out.soft.push(`Bouwjaar ${rec.jaar} valt buiten de jaren van dit model.`);
-          else { out.vp = true; out.ok.push(`RDW: ${rec.merk} ${rec.handelsbenaming}, ${fuels}${rec.jaar ? ", " + rec.jaar : ""}.`); }
+          else { out.vp = true; out.ok.push(`RDW: ${rdwName(rec)}, ${fuels}${rec.jaar ? ", " + rec.jaar : ""}.`); }
         }
       }
     }

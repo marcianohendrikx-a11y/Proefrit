@@ -124,7 +124,7 @@ create temp table nieuw on commit drop as
   from public.rdw_models r
   join rn on rn.brand = r.brand and rn.trade_name = r.trade_name
   join bm on bm.nb = rn.nb
-  where r.car_id is null and r.vehicles >= ${MIN} and r.first_year is not null
+  where r.car_id is null and r.match <> 'zeker' and r.vehicles >= ${MIN} and r.first_year is not null
     and rn.nt ~ '[a-z]'                                   -- niet alleen cijfers
     and rn.nt !~ '^[0-9]+[a-z]+[0-9a-z]*( |$)'            -- geen typecodes zoals 1j, 7dw, 70x0b
     and rn.nt !~ '^[0-9]{4,}'                             -- geen typenummers zoals 171021

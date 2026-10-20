@@ -132,6 +132,7 @@ async function loadExtraCars(){
     CARS.push(c);CARMAP.set(c.id,c);
     if(!BRANDS.includes(c.brand)){BRANDS.push(c.brand);BRANDS.sort((a,b)=>a.localeCompare(b,'nl'))}
   });
+  try{const v=$('ci-brand').value;fillBrands('ci');$('ci-brand').value=v}catch(e){}
 }
 
 async function loadCommunity(){
@@ -435,4 +436,46 @@ async function checkTicketReplies(){
   if(!fresh.length)return;
   try{localStorage.setItem('proefrit-antwoorden-gezien',JSON.stringify(seen.concat(fresh.map(t=>t.id+'@'+t.repliedAt)).slice(-100)))}catch(e){}
   toast(fresh.length>1?'Het team heeft je meldingen beantwoord. Bekijk ze via Opmerking over de website onderaan.':'Het team heeft je melding beantwoord. Bekijk het via Opmerking over de website onderaan.');
+}
+
+/* ---------- Auto zoeken in formulieren: typ merk en/of model in plaats van door lange lijsten te scrollen ---------- */
+const FIND_ALIAS={vw:'volkswagen',merc:'mercedes',benz:'mercedes',chevy:'chevrolet',landrover:'land',alfa:'alfa'};
+function findCars(q,limit){
+  const toks=lc(q).split(' ').filter(Boolean).map(t=>FIND_ALIAS[t]||t);
+  if(!toks.length)return [];
+  const q2=toks.join('');
+  const hits=CARS.filter(c=>carHit(c,toks)||(q2.length>=3&&lc(c.brand+' '+c.model).replace(/ /g,'').includes(q2)));
+  const name=c=>lc(c.brand+' '+c.model);
+  const score=c=>{const n=name(c),m=lc(c.model);let s=0;
+    if(toks.every(t=>(' '+n).includes(' '+t)))s+=4;          // alle woorden in merk of model zelf, niet alleen in een versie
+    const last=toks[toks.length-1];
+    if(m.startsWith(last))s+=2;
+    if(m.split(' ').includes(last))s+=3;
+    if(!c.rdw)s+=1;
+    return s};
+  return hits.map(c=>({c,s:score(c)})).sort((a,b)=>b.s-a.s||a.c.model.length-b.c.model.length||carName(a.c).localeCompare(carName(b.c),'nl')).slice(0,limit||8).map(x=>x.c);
+}
+function addCarFinder(p,onChange){
+  const brand=$(p+'-brand');if(!brand||$(p+'-find'))return;
+  const row=brand.closest('.two')||brand.parentElement;
+  const box=document.createElement('div');box.className='finder';
+  box.innerHTML=`<label class="l" for="${p}-find">Zoek je auto</label><input id="${p}-find" class="field" type="search" autocomplete="off" placeholder="Typ merk en model, bijvoorbeeld Golf of Ram 1500" aria-controls="${p}-findres" aria-autocomplete="list"><div class="hres finres" id="${p}-findres" role="listbox" hidden></div><p class="hint">Of kies hieronder merk en model uit de lijst.</p>`;
+  row.parentElement.insertBefore(box,row);
+  const inp=$(p+'-find'),res=$(p+'-findres');let list=[],act=-1;
+  const show=()=>{
+    list=findCars(inp.value,8);act=list.length?0:-1;
+    if(!inp.value.trim()){res.hidden=true;return}
+    res.innerHTML=list.length?list.map((c,i)=>`<button type="button" class="sr${i===act?' on':''}" role="option" data-find="${esc(c.id)}">${emblem(c.brand,'sm')}<span><b>${esc(carName(c))}</b><small>${years(c)} · ${BODY_NAME[bodyOf(c)]}</small></span></button>`).join(''):'<div class="none">Geen auto gevonden. Probeer een andere schrijfwijze, of kies hieronder uit de lijst.</div>';
+    res.hidden=false;
+  };
+  const pick=id=>{setPicker(p,id,'','');autoFilled[p]=null;inp.value='';res.hidden=true;onChange&&onChange();const f=$(p+'-fuel');if(f&&!f.value)f.focus()};
+  inp.addEventListener('input',show);
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){if(!list.length)return;e.preventDefault();act=(act+(e.key==='ArrowDown'?1:-1)+list.length)%list.length;res.querySelectorAll('.sr').forEach((b,i)=>b.classList.toggle('on',i===act))}
+    else if(e.key==='Enter'){e.preventDefault();if(list[act])pick(list[act].id)}
+    else if(e.key==='Escape'){res.hidden=true}
+  });
+  res.addEventListener('mousedown',e=>e.preventDefault());
+  res.addEventListener('click',e=>{const b=e.target.closest('[data-find]');if(b)pick(b.dataset.find)});
+  inp.addEventListener('blur',()=>setTimeout(()=>{res.hidden=true},150));
 }
