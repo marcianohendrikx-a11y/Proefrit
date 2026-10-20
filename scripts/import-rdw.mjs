@@ -20,10 +20,10 @@ const URL_BASE = "https://opendata.rdw.nl/resource/m9d7-ebf2.json";
 
 async function fetchPage(offset) {
   const q = new URLSearchParams({
-    $select: "merk, handelsbenaming, min(datum_eerste_toelating) AS eerste, max(datum_eerste_toelating) AS laatste, count(*) AS aantal",
-    $where: "voertuigsoort = 'Personenauto'",
-    $group: "merk, handelsbenaming",
-    $order: "merk, handelsbenaming",
+    $select: "merk, handelsbenaming, voertuigsoort, min(datum_eerste_toelating) AS eerste, max(datum_eerste_toelating) AS laatste, count(*) AS aantal",
+    $where: "voertuigsoort in ('Personenauto', 'Bedrijfsauto')",
+    $group: "merk, handelsbenaming, voertuigsoort",
+    $order: "merk, handelsbenaming, voertuigsoort",
     $limit: String(PAGE),
     $offset: String(offset),
   });
@@ -67,27 +67,37 @@ const year = (v) => { const m = String(v ?? "").match(/^(\d{4})/); return m ? Nu
 const clean = (s) => String(s ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
 const lit = (s) => (s == null ? "null" : `'${String(s).replace(/'/g, "''")}'`);
 
-const rows = (await load())
-  .map((r) => ({ brand: clean(r.merk), trade: clean(r.handelsbenaming), first: year(r.eerste), last: year(r.laatste), n: Number(r.aantal) || 0 }))
-  .filter((r) => r.brand && r.trade && r.n > 0);
+// Personenauto's en bedrijfsauto's (veel pick-ups en busjes rijden op grijs kenteken). Bedrijfsauto's worden alleen
+// gekoppeld aan modellen die al in de catalogus staan; nieuwe modellen komen alleen uit personenauto's.
+const merged = new Map();
+for (const r of await load()) {
+  const row = { brand: clean(r.merk), trade: clean(r.handelsbenaming), first: year(r.eerste), last: year(r.laatste), n: Number(r.aantal) || 0, pn: r.voertuigsoort === "Personenauto" ? Number(r.aantal) || 0 : 0 };
+  if (!row.brand || !row.trade || row.n <= 0) continue;
+  const k = row.brand + "\u0000" + row.trade, o = merged.get(k);
+  if (!o) { merged.set(k, row); continue; }
+  o.n += row.n; o.pn += row.pn;
+  o.first = o.first == null ? row.first : row.first == null ? o.first : Math.min(o.first, row.first);
+  o.last = o.last == null ? row.last : row.last == null ? o.last : Math.max(o.last, row.last);
+}
+const rows = [...merged.values()];
 
 let sql = `set statement_timeout = 0;
 -- RDW-modelnamen voor personenauto's (RDW Open Data, CC0). Gegenereerd door scripts/import-rdw.mjs op ${new Date().toISOString().slice(0, 10)}.
 -- ${rows.length} combinaties van merk en handelsbenaming. Nieuwe modellen vanaf ${MIN} voertuigen.
 begin;
-create temp table rdw_in (brand text, trade_name text, first_year int, last_year int, vehicles int) on commit drop;
+create temp table rdw_in (brand text, trade_name text, first_year int, last_year int, vehicles int, passenger int) on commit drop;
 create temp table alias (nb text primary key, brand text) on commit drop;
 insert into alias values ${Object.entries(BRAND_ALIAS).map(([k, v]) => `(${lit(k)},${lit(v)})`).join(",")};
 `;
 for (let i = 0; i < rows.length; i += 1000) {
-  sql += "insert into rdw_in values\n" + rows.slice(i, i + 1000).map((r) => `(${lit(r.brand)},${lit(r.trade)},${r.first ?? "null"},${r.last ?? "null"},${r.n})`).join(",\n") + ";\n";
+  sql += "insert into rdw_in values\n" + rows.slice(i, i + 1000).map((r) => `(${lit(r.brand)},${lit(r.trade)},${r.first ?? "null"},${r.last ?? "null"},${r.n},${r.pn})`).join(",\n") + ";\n";
 }
 sql += `
 -- 1. Bijwerken; een nagekeken koppeling (match = 'zeker') blijft staan.
-insert into public.rdw_models (brand, trade_name, first_year, last_year, vehicles)
-  select brand, trade_name, min(first_year), max(last_year), sum(vehicles) from rdw_in group by brand, trade_name
+insert into public.rdw_models (brand, trade_name, first_year, last_year, vehicles, passenger_vehicles)
+  select brand, trade_name, min(first_year), max(last_year), sum(vehicles), sum(passenger) from rdw_in group by brand, trade_name
 on conflict (brand, trade_name) do update set first_year = excluded.first_year, last_year = excluded.last_year,
-  vehicles = excluded.vehicles, updated_at = now();
+  vehicles = excluded.vehicles, passenger_vehicles = excluded.passenger_vehicles, updated_at = now();
 
 -- 2. Voorstel: het langste model uit de catalogus waarmee de RDW-naam begint (ook met het merk ervoor),
 --    of 'C 200' -> 'C-Klasse'. Namen worden één keer genormaliseerd en per merk vergeleken (snel, ook bij 100.000 namen).
@@ -124,7 +134,7 @@ create temp table nieuw on commit drop as
   from public.rdw_models r
   join rn on rn.brand = r.brand and rn.trade_name = r.trade_name
   join bm on bm.nb = rn.nb
-  where r.car_id is null and r.match <> 'zeker' and r.vehicles >= ${MIN} and r.first_year is not null
+  where r.car_id is null and r.match <> 'zeker' and r.passenger_vehicles >= ${MIN} and r.first_year is not null
     and rn.nt ~ '[a-z]'                                   -- niet alleen cijfers
     and rn.nt !~ '^[0-9]+[a-z]+[0-9a-z]*( |$)'            -- geen typecodes zoals 1j, 7dw, 70x0b
     and rn.nt !~ '^[0-9]{4,}'                             -- geen typenummers zoals 171021
