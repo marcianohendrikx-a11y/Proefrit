@@ -155,7 +155,7 @@ export async function readPlatePhoto(b64: string, mediaType: string) {
     headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
       model,
-      max_tokens: 200,
+      max_tokens: 400,
       messages: [{ role: "user", content: [
         { type: "image", source: { type: "base64", media_type: type, data: b64.replace(/^data:[^,]+,/, "") } },
         { type: "text", text: PHOTO_PROMPT },

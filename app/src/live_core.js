@@ -1,0 +1,386 @@
+/* ===== Koppeling met de backend (Supabase): inloggen, gegevens laden en opslaan =====
+   Zonder extra bibliotheek: alles via fetch naar de REST-, Auth-, Storage- en Functions-API van Supabase.
+   De publieke 'anon'-sleutel staat in de pagina; de beveiliging zit in de databaseregels (Row Level Security). */
+const SB=window.PROEFRIT_CONFIG;
+const SESS_KEY='proefrit-sessie',PENDING_KEY='proefrit-nieuw-account';
+const appUrl=()=>location.origin+location.pathname;
+let sbSession=null;
+try{sbSession=JSON.parse(localStorage.getItem(SESS_KEY)||'null')}catch(e){}
+function sessSave(s){sbSession=s;try{if(s)localStorage.setItem(SESS_KEY,JSON.stringify(s));else localStorage.removeItem(SESS_KEY)}catch(e){}}
+const sbUid=()=>sbSession&&sbSession.user?sbSession.user.id:null;
+const normSess=j=>({access_token:j.access_token,refresh_token:j.refresh_token,expires_at:+j.expires_at||Math.floor(Date.now()/1000)+(+j.expires_in||3600),user:j.user||null});
+const NL_ERR=[
+ [/invalid login credentials/i,'E-mailadres of wachtwoord klopt niet.'],
+ [/email not confirmed/i,'Bevestig eerst je e-mailadres met de link in de mail die we je stuurden.'],
+ [/user already registered|already been registered/i,'Met dit e-mailadres bestaat al een account. Log in of kies Wachtwoord vergeten.'],
+ [/password should be at least|weak password/i,'Kies een sterker wachtwoord van minstens 8 tekens.'],
+ [/rate limit|too many|over_email_send_rate_limit|email rate/i,'Er zijn net te veel pogingen gedaan. Probeer het over een paar minuten opnieuw.'],
+ [/profiles_username_lower|profiles_username_key|duplicate key.*username/i,'Deze gebruikersnaam is al in gebruik. Kies een andere.'],
+ [/conversations_pair|duplicate key.*conversations/i,'Er bestaat al een gesprek of verzoek met dit lid.'],
+ [/likes_pkey/i,'Je gaf deze check-in al een Top!'],
+ [/row-level security|permission denied|not allowed/i,'Dat mag niet met je account.'],
+ [/jwt expired|invalid jwt|refresh token/i,'Je sessie is verlopen. Log opnieuw in.'],
+ [/failed to fetch|networkerror|load failed/i,'Geen verbinding met Proefrit. Controleer je internet en probeer het opnieuw.'],
+ [/username_check|profiles_username_check/i,'Kies een gebruikersnaam van 3 tot 20 tekens met letters, cijfers, punt, streepje of underscore.'],
+ [/city_check|bio_check/i,'Een van de teksten is te lang.']
+];
+function nlMsg(m){m=String(m||'');for(const [re,t] of NL_ERR)if(re.test(m))return t;return m||'Er ging iets mis. Probeer het opnieuw.'}
+function sbErr(j,status){const m=j&&(j.error_description||j.msg||j.message||(typeof j.error==='string'?j.error:''))||('Er ging iets mis (fout '+status+').');const e=new Error(nlMsg(m));e.status=status;e.data=j;return e}
+let refreshing=null;
+async function sbRefresh(){
+  if(!sbSession||!sbSession.refresh_token)return;
+  if(!refreshing)refreshing=(async()=>{
+    const r=await fetch(SB.url+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{apikey:SB.key,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:sbSession.refresh_token})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||!j.access_token){sessSave(null);sessionLost();return}
+    sessSave(normSess(j));
+  })().finally(()=>{refreshing=null});
+  return refreshing;
+}
+async function sbToken(){
+  if(sbSession&&sbSession.expires_at*1000<Date.now()+90e3)await sbRefresh();
+  return sbSession?sbSession.access_token:null;
+}
+async function sbHeaders(extra){const t=await sbToken();return {apikey:SB.key,Authorization:'Bearer '+(t||SB.key),...(extra||{})}}
+async function sbFetch(url,opt,retry){
+  let r;
+  try{r=await fetch(url,{...opt,headers:await sbHeaders(opt.headers)})}catch(e){throw new Error(nlMsg('failed to fetch'))}
+  if(r.status===401&&sbSession&&!retry){await sbRefresh();if(sbSession)return sbFetch(url,opt,true)}
+  return r;
+}
+async function rest(method,path,body,prefer){
+  const h={'Content-Type':'application/json'};if(prefer)h.Prefer=prefer;
+  const r=await sbFetch(SB.url+'/rest/v1/'+path,{method,headers:h,body:body===undefined?undefined:JSON.stringify(body)});
+  const txt=await r.text();let j=null;try{j=txt?JSON.parse(txt):null}catch(e){}
+  if(!r.ok)throw sbErr(j,r.status);
+  return j;
+}
+const restAll=async(path,page)=>{page=page||1000;const out=[];for(let from=0;;from+=page){const sep=path.includes('?')?'&':'?';const l=await rest('GET',`${path}${sep}limit=${page}&offset=${from}`);out.push(...(l||[]));if(!l||l.length<page)break}return out};
+const inList=ids=>'('+[...new Set(ids)].map(x=>'"'+String(x).replace(/"/g,'')+'"').join(',')+')';
+async function restIn(table,select,col,ids,extra){
+  const u=[...new Set(ids)],out=[];
+  for(let i=0;i<u.length;i+=80){const l=await rest('GET',`${table}?select=${select}&${col}=in.${encodeURIComponent(inList(u.slice(i,i+80)))}${extra||''}`);out.push(...(l||[]))}
+  return out;
+}
+async function fn(name,body){
+  const r=await sbFetch(SB.url+'/functions/v1/'+name,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+  const j=await r.json().catch(()=>null);
+  if(!r.ok)throw sbErr(j,r.status);
+  return j;
+}
+const rpc=(name,args)=>rest('POST','rpc/'+name,args);
+async function authPost(path,body){
+  let r;
+  try{r=await fetch(SB.url+'/auth/v1/'+path,{method:'POST',headers:{apikey:SB.key,'Content-Type':'application/json'},body:JSON.stringify(body)})}catch(e){throw new Error(nlMsg('failed to fetch'))}
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw sbErr(j,r.status);
+  return j;
+}
+async function authUser(){
+  const r=await sbFetch(SB.url+'/auth/v1/user',{method:'GET',headers:{}});
+  if(!r.ok)return null;
+  return r.json();
+}
+const likeEsc=s=>String(s).replace(/[\\%_*]/g,m=>'\\'+m);
+const pubUrl=(bucket,path)=>SB.url+'/storage/v1/object/public/'+bucket+'/'+String(path).split('/').map(encodeURIComponent).join('/');
+async function upload(bucket,path,blob){
+  const r=await sbFetch(SB.url+'/storage/v1/object/'+bucket+'/'+path,{method:'POST',headers:{'Content-Type':blob.type||'image/jpeg','x-upsert':'false'},body:blob});
+  const j=await r.json().catch(()=>null);
+  if(!r.ok)throw sbErr(j,r.status);
+  return pubUrl(bucket,path);
+}
+const dataUrlB64=u=>String(u).split(',')[1]||'';
+async function dataUrlBlob(u){return (await fetch(u)).blob()}
+/* Foto verkleinen voor de controle op de server (max 1600 px, JPEG) */
+async function photoPayload(file){
+  if(!file)return null;
+  const img=await fileToImg(file),cv=drawScaled(img,1600);
+  return {data:dataUrlB64(cv.toDataURL('image/jpeg',.85)),type:'image/jpeg',taken_at:file.lastModified};
+}
+
+/* ---------- Gegevens uit de database omzetten naar de vorm van de app ---------- */
+const LV={loaded:false,loadErr:'',ids:{},byName:{},email:'',myRow:null,hidden:new Set()};
+const nameOf=id=>(LV.ids[id]||{}).username||'Oud lid';
+const sinceText=ts=>ts?new Date(ts).toLocaleDateString('nl-NL',{month:'short',year:'numeric'}):'';
+function mapReview(x){
+  return {id:x.id,uid:x.user_id,car:x.car_id,user:nameOf(x.user_id),ts:Date.parse(x.created_at),rit:x.ride_date,fuel:x.fuel,ver:x.version||'',ride:x.ride_type,
+    overall:x.overall,cats:{rij:x.score_drive,comfort:x.score_comfort,motor:x.score_engine,ruimte:x.score_space,prijs:x.score_value},
+    text:x.body||'',tags:x.tags||[],vp:!!x.plate_verified,vh:!!x.photo_verified,likes:0,comments:[]};
+}
+const mapComment=c=>({id:c.id,uid:c.user_id,user:nameOf(c.user_id),text:c.body,ts:Date.parse(c.created_at)});
+const mapGarage=g=>({id:g.id,car:g.car_id,status:g.status,fuel:g.fuel,ver:g.version||'',year:g.year?String(g.year):'',vp:!!g.plate_verified,tags:g.tags||[]});
+const licOf=v=>v==='geen'?'geen':(v?+v:'');
+function profileFromRow(p){
+  return {birthYear:p.birth_year||0,city:p.city||'',licenseSince:licOf(p.license_since),kmYear:p.km_year||'',bio:p.bio||'',interests:p.interests||[],avatar:p.avatar_url||'',
+    vis:{age:p.share_age?'band':'hidden',loc:p.share_city?'city':'hidden',exp:p.share_experience?'shown':'hidden'},
+    profileVis:p.public_profile?'all':'members',chatFrom:p.chat_requests?'all':'none',onboarded:!!p.onboarded,garage:[]};
+}
+function profileFromCard(c){
+  return {ageBand:c.age_band||'',city:c.city||'',licenseSince:licOf(c.license_since),kmYear:c.km_year||'',bio:c.bio||'',interests:c.interests||[],avatar:c.avatar_url||'',
+    vis:{age:c.age_band?'band':'hidden',loc:c.city?'city':'hidden',exp:c.license_since||c.km_year?'shown':'hidden'},
+    profileVis:'all',chatFrom:c.chat_requests?'all':'none',onboarded:true,garage:[]};
+}
+
+/* Modellen die alleen uit de RDW-import komen (nog niet in de ingebouwde catalogus) */
+async function loadExtraCars(){
+  const l=await restAll('cars?select=id,brand,model,year_from,year_to,body,fuels&source=eq.rdw&order=id');
+  l.forEach(x=>{
+    if(CARMAP.has(x.id))return;
+    const fuels=x.fuels&&x.fuels.length?FUELS.filter(f=>x.fuels.includes(f)):FUELS.slice();
+    const c={id:x.id,brand:x.brand,model:x.model,from:x.year_from,to:x.year_to,versions:[],body:x.body||'',fuels,rdw:true};
+    c.search=' '+(c.brand+' '+c.model).toLowerCase().replace(/[()\/,]/g,' ');
+    CARS.push(c);CARMAP.set(c.id,c);
+    if(!BRANDS.includes(c.brand)){BRANDS.push(c.brand);BRANDS.sort((a,b)=>a.localeCompare(b,'nl'))}
+  });
+}
+
+async function loadCommunity(){
+  const uid=sbUid();
+  const [names,cards,revs,garage]=await Promise.all([
+    restAll('profile_names?select=id,username,avatar_url&order=id'),
+    restAll('profile_cards?select=*&order=id'),
+    rest('GET','reviews?select=*&order=created_at.desc&limit=400'),
+    restAll('garage_items?select=*&order=created_at')
+  ]);
+  LV.ids={};LV.byName={};
+  names.forEach(n=>{LV.ids[n.id]=n;LV.byName[n.username]=n});
+  const cardOf={};cards.forEach(c=>cardOf[c.id]=c);
+  store.accounts={};store.profiles={};
+  names.forEach(n=>{
+    store.accounts[n.username.toLowerCase()]={name:n.username,id:n.id,since:sinceText(cardOf[n.id]&&cardOf[n.id].created_at)};
+    store.profiles[n.username]=cardOf[n.id]?profileFromCard(cardOf[n.id]):{avatar:n.avatar_url||'',profileVis:'members',onboarded:true,garage:[]};
+  });
+  if(uid&&LV.myRow){
+    const p=profileFromRow(LV.myRow);store.profiles[LV.myRow.username]=p;
+    const a=store.accounts[LV.myRow.username.toLowerCase()];if(a)a.since=sinceText(LV.myRow.created_at);
+  }
+  garage.forEach(g=>{const n=LV.ids[g.user_id];if(!n||!carById(g.car_id))return;const p=store.profiles[n.username];if(p)p.garage.push(mapGarage(g))});
+  const list=(revs||[]).filter(x=>carById(x.car_id)).map(mapReview);
+  const ids=list.map(r=>r.id);
+  const [likes,comments]=ids.length?await Promise.all([
+    restIn('likes','review_id,user_id','review_id',ids),
+    restIn('comments','id,review_id,user_id,body,created_at','review_id',ids,'&order=created_at')
+  ]):[[],[]];
+  const byId={};list.forEach(r=>byId[r.id]=r);
+  store.liked={};
+  likes.forEach(l=>{const r=byId[l.review_id];if(!r)return;if(uid&&l.user_id===uid)store.liked[me()+':'+r.id]=true;else r.likes++});
+  comments.forEach(c=>{const r=byId[c.review_id];if(r)r.comments.push(mapComment(c))});
+  SEED.length=0;SEED.push(...list);
+  store.mine=[];store.comments={};
+}
+
+async function loadMine(){
+  LV.myRow=null;OWNER=false;
+  const uid=sbUid();if(!uid)return null;
+  const [rows,adm]=await Promise.all([rest('GET','profiles?select=*&id=eq.'+uid),rest('GET','admins?select=user_id&user_id=eq.'+uid).catch(()=>[])]);
+  LV.myRow=rows&&rows[0]||null;OWNER=!!(adm&&adm.length);
+  return LV.myRow;
+}
+
+/* ---------- Chat ---------- */
+let chatSig='';
+async function loadChats(){
+  const uid=sbUid(),m=me();
+  if(!uid||!m){store.chats={};return false}
+  const convs=await rest('GET','conversations?select=*&order=updated_at.desc');
+  const msgs=convs.length?await restIn('messages','id,conversation_id,sender_id,body,created_at','conversation_id',convs.map(c=>c.id),'&order=created_at'):[];
+  const c={};
+  convs.forEach(cv=>{
+    const other=cv.user_a===uid?cv.user_b:cv.user_a,name=nameOf(other);
+    const ms=msgs.filter(x=>x.conversation_id===cv.id).map(x=>({me:x.sender_id===uid,text:x.body,ts:Date.parse(x.created_at)}));
+    let state;
+    if(cv.state==='active')state='active';
+    else if(cv.state==='blocked')state=cv.blocked_by===uid?'blocked':'closed';
+    else if(cv.state==='requested')state=cv.requested_by===uid?(ms.length?'out':'new'):'in';
+    else state=cv.requested_by===uid?'out':null;   // geweigerd: de aanvrager ziet 'wacht op akkoord', de ontvanger niets meer
+    if(state&&(ms.length||state==='new'||state==='blocked'))c[name]={state,msgs:ms,conv:cv.id,other};
+  });
+  store.chats={[m]:c};
+  const sig=JSON.stringify(Object.entries(c).map(([k,v])=>[k,v.state,v.msgs.length]));
+  const changed=sig!==chatSig;chatSig=sig;return changed;
+}
+async function chatSend(name,text){
+  const cs=chatsOf(),r=cs[name],uid=sbUid(),other=LV.byName[name];
+  if(!other)throw new Error('Dit lid bestaat niet (meer).');
+  if(!r||r.state==='new'){
+    let conv=r&&r.conv;
+    if(!conv){const row=await rest('POST','conversations',{user_a:uid,user_b:other.id,requested_by:uid},'return=representation');conv=row[0].id}
+    await rest('POST','messages',{conversation_id:conv,sender_id:uid,body:text});
+    toast(`Verzoek verstuurd. ${name} moet eerst akkoord geven.`);
+  }else if(r.state==='active')await rest('POST','messages',{conversation_id:r.conv,sender_id:uid,body:text});
+  else return;
+  await loadChats();
+}
+async function chatAction(name,action){
+  const r=chatsOf()[name];if(!r||!r.conv)return;
+  if(action==='unblock'||action==='withdraw')await rpc('chat_remove',{conv:r.conv,action});
+  else await rpc('respond_chat',{conv:r.conv,action});
+  await loadChats();
+}
+/* Nieuwe berichten ophalen zolang de pagina open is (elke 15 seconden) */
+setInterval(async()=>{
+  if(!me()||document.visibilityState!=='visible'||dlg.open||odlg.open)return;
+  try{
+    const changed=await loadChats();if(!changed)return;
+    const rc=reqCount(),dot=$('chatdot');dot.hidden=rc===0;dot.textContent=rc;
+    if(view.name==='chat'){
+      const i=$('chat-in'),val=i?i.value:'',had=document.activeElement===i;
+      render();const j=$('chat-in');if(j){j.value=val;if(had)j.focus({preventScroll:true})}
+      if(view.chat)window.scrollTo(0,document.body.scrollHeight);
+    }
+  }catch(e){}
+},15000);
+
+/* ---------- Opslaan ---------- */
+async function saveProfileLive(d){
+  const uid=sbUid();let avatar=d.avatar||null;
+  if(avatar&&avatar.startsWith('data:')){
+    avatar=await upload('avatars',`${uid}/avatar-${Date.now().toString(36)}.jpg`,await dataUrlBlob(avatar));
+    d.avatar=avatar;
+  }
+  const patch={birth_year:d.birthYear||LV.myRow.birth_year,city:d.city||null,license_since:d.licenseSince===''||d.licenseSince==null?null:String(d.licenseSince),km_year:d.kmYear||null,
+    bio:d.bio||null,interests:d.interests||[],avatar_url:avatar,share_age:d.vis.age==='band',share_city:d.vis.loc==='city',share_experience:d.vis.exp==='shown',
+    public_profile:d.profileVis==='all',chat_requests:d.chatFrom!=='none'};
+  const rows=await rest('PATCH','profiles?id=eq.'+uid,patch,'return=representation');
+  LV.myRow=rows[0];
+  const garage=profileOf(me()).garage;
+  store.profiles[me()]={...profileFromRow(LV.myRow),garage};
+  if(LV.ids[uid])LV.ids[uid].avatar_url=LV.myRow.avatar_url;
+}
+async function markOnboarded(){
+  if(!LV.myRow||LV.myRow.onboarded)return;
+  try{const rows=await rest('PATCH','profiles?id=eq.'+sbUid(),{onboarded:true},'return=representation');LV.myRow=rows[0]}catch(e){}
+}
+
+/* ---------- Opstarten en sessie ---------- */
+function sessionLost(){
+  if(!store.session)return;
+  store.session='';store.chats={};OWNER=false;LV.myRow=null;renderAcct();render();
+  toast('Je sessie is verlopen. Log opnieuw in.');
+}
+async function reloadAll(){
+  try{await loadCommunity();LV.loaded=true;LV.loadErr=''}catch(e){LV.loadErr=e.message;LV.loaded=true}
+  if(me())try{await loadChats()}catch(e){}
+  if(OWNER){try{await loadInbox()}catch(e){}try{await loadModq()}catch(e){}}
+  for(const k in carPhotos)delete carPhotos[k];myPhotoItems=null;
+  renderAcct();render();
+}
+/* Na inloggen (e-mail, Google of bevestigingslink): profiel ophalen of aanmaken */
+async function afterAuth(){
+  const row=await loadMine();
+  if(!row){
+    let pend=null;try{pend=JSON.parse(localStorage.getItem(PENDING_KEY)||'null')}catch(e){}
+    if(pend&&pend.username){
+      try{await createProfile(pend.username,pend.birth_year);try{localStorage.removeItem(PENDING_KEY)}catch(e){}}
+      catch(e){openNameDialog(e.message,pend);return}
+    }else{openNameDialog('',null);return}
+  }
+  store.session=LV.myRow.username;
+  try{LV.email=(sbSession.user&&sbSession.user.email)||''}catch(e){}
+  await reloadAll();
+  afterLogin();
+}
+async function createProfile(username,birth){
+  const uid=sbUid();
+  const free=await rest('GET','profile_names?select=id&username=ilike.'+encodeURIComponent(likeEsc(username)));
+  if(free&&free.length&&free[0].id!==uid)throw new Error('Deze gebruikersnaam is al in gebruik. Kies een andere.');
+  const rows=await rest('POST','profiles',{id:uid,username,birth_year:birth},'return=representation');
+  LV.myRow=rows[0];
+}
+function validName(name){
+  if(!/^[A-Za-z0-9_.-]{3,20}$/.test(name))return 'Kies een gebruikersnaam van 3 tot 20 tekens met letters, cijfers, punt, streepje of underscore.';
+  if(WF.check(name)||WF.check(name.replace(/[_.-]+/g,' ')))return 'Kies een andere gebruikersnaam; deze bevat een woord dat niet is toegestaan.';
+  if(RESERVED.has(name.toLowerCase()))return 'Deze gebruikersnaam is al in gebruik. Kies een andere.';
+  return '';
+}
+/* Kleine dialoog: gebruikersnaam kiezen (na Google) of een nieuw wachtwoord instellen */
+const udlg=$('udlg');let udlgMode='',udlgDone=false;
+function openNameDialog(msg,pend){
+  udlgMode='name';udlgDone=false;
+  const yrs=Array.from({length:YEAR-8-1920+1},(_,i)=>YEAR-8-i).map(y=>`<option value="${y}"${pend&&pend.birth_year===y?' selected':''}>${y}</option>`).join('');
+  $('ubox').innerHTML=`<div class="fh"><span class="lp"><i aria-hidden="true">NL</i><b>PROEFRIT</b></span></div>
+    <div><h2 id="utitle">Kies je gebruikersnaam</h2><p class="sub" style="margin:0">Nog één stap. Je gebruikersnaam staat bij je check-ins; je e-mailadres laten we nooit zien.</p></div>
+    <form id="uform" class="stack" novalidate>
+      <div><label class="l" for="u-name">Gebruikersnaam</label><input id="u-name" class="field" maxlength="20" autocomplete="username" value="${esc(pend&&pend.username||'')}" placeholder="Bijvoorbeeld Max_V"><p class="hint">3 tot 20 tekens: letters, cijfers, punt, streepje of underscore.</p></div>
+      <div><label class="l" for="u-birth">Geboortejaar</label><select id="u-birth" class="field"><option value="">Kies je geboortejaar…</option>${yrs}</select><p class="hint">Je moet 16 jaar of ouder zijn. Je kiest straks zelf of anderen je leeftijdsgroep zien.</p></div>
+      <p class="err" id="u-err" role="alert">${esc(msg||'')}</p>
+      <button class="cta" type="submit">Verder</button>
+    </form>
+    <button class="plain" type="button" data-act="ucancel" style="align-self:flex-start">Annuleren en uitloggen</button>`;
+  if(!udlg.open)udlg.showModal();
+}
+function openPasswordDialog(){
+  udlgMode='pw';udlgDone=false;
+  $('ubox').innerHTML=`<div class="fh"><span class="lp"><i aria-hidden="true">NL</i><b>PROEFRIT</b></span><button type="button" class="x" data-act="ucancel" aria-label="Sluiten">×</button></div>
+    <div><h2 id="utitle">Nieuw wachtwoord</h2><p class="sub" style="margin:0">Kies een nieuw wachtwoord voor je account.</p></div>
+    <form id="uform" class="stack" novalidate>
+      <div><label class="l" for="u-pw">Nieuw wachtwoord</label><input id="u-pw" class="field" type="password" autocomplete="new-password"><p class="hint">Minstens 8 tekens.</p></div>
+      <p class="err" id="u-err" role="alert"></p>
+      <button class="cta" type="submit">Opslaan</button>
+    </form>`;
+  if(!udlg.open)udlg.showModal();
+}
+udlg.addEventListener('submit',async e=>{
+  e.preventDefault();const err=$('u-err'),btn=e.target.querySelector('button.cta');err.textContent='';
+  try{
+    btn.disabled=true;
+    if(udlgMode==='pw'){
+      const pw=$('u-pw').value;if(pw.length<8){err.textContent='Kies een wachtwoord van minstens 8 tekens.';return}
+      const r=await sbFetch(SB.url+'/auth/v1/user',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+      if(!r.ok)throw sbErr(await r.json().catch(()=>null),r.status);
+      udlgDone=true;udlg.close();toast('Je nieuwe wachtwoord is opgeslagen.');
+      if(!me())await afterAuth();
+      return;
+    }
+    const name=$('u-name').value.trim(),by=+$('u-birth').value,bad=validName(name);
+    if(bad){err.textContent=bad;return}
+    if(!by){err.textContent='Kies je geboortejaar.';return}
+    if(YEAR-by<MIN_AGE){err.textContent=`Je moet minstens ${MIN_AGE} jaar zijn om een account te maken. Rondkijken kan wel zonder account.`;return}
+    await createProfile(name,by);
+    try{localStorage.removeItem(PENDING_KEY)}catch(e){}
+    udlgDone=true;udlg.close();await afterAuth();
+  }catch(ex){err.textContent=ex.message}
+  finally{btn.disabled=false}
+});
+udlg.addEventListener('cancel',e=>{if(udlgMode==='name')e.preventDefault()});
+async function signOut(silent){
+  try{if(sbSession)await sbFetch(SB.url+'/auth/v1/logout',{method:'POST',headers:{}})}catch(e){}
+  sessSave(null);store.session='';store.chats={};OWNER=false;LV.myRow=null;LV.email='';inbox=null;modq=null;
+  await reloadAll();
+  if(!silent)toast('Je bent uitgelogd.');
+}
+function googleLogin(){
+  location.href=SB.url+'/auth/v1/authorize?provider=google&redirect_to='+encodeURIComponent(appUrl());
+}
+/* Terugkomst van Google, een bevestigingsmail of een wachtwoordlink: de sessie staat in het #-deel van de URL */
+async function readAuthHash(){
+  const h=location.hash.slice(1);
+  if(!/access_token=|error_description=|error=/.test(h))return '';
+  const p=new URLSearchParams(h);
+  history.replaceState(null,'',appUrl()+location.search);
+  if(p.get('error_description')||p.get('error')){toast(nlMsg(p.get('error_description')||p.get('error')).replace(/\+/g,' '));return ''}
+  sessSave(normSess({access_token:p.get('access_token'),refresh_token:p.get('refresh_token'),expires_at:p.get('expires_at'),expires_in:p.get('expires_in')}));
+  const u=await authUser();
+  if(!u){sessSave(null);toast('Inloggen lukte niet. Probeer het opnieuw.');return ''}
+  sbSession.user=u;sessSave(sbSession);
+  return p.get('type')||'login';
+}
+async function boot(){
+  renderAcct();render();
+  let kind='';
+  try{kind=await readAuthHash()}catch(e){}
+  try{await loadExtraCars()}catch(e){}
+  if(sbSession&&!kind){const u=await authUser().catch(()=>null);if(!u)sessSave(null);else{sbSession.user=u;sessSave(sbSession)}}
+  if(sbSession){
+    let row=null;try{row=await loadMine()}catch(e){}
+    if(row){store.session=row.username;LV.email=(sbSession.user&&sbSession.user.email)||''}
+  }
+  await reloadAll();
+  if(kind==='recovery'){openPasswordDialog();return}
+  if(sbSession&&!LV.myRow){await afterAuth();return}
+  if(kind&&me()){afterLogin();return}
+  if(me()){
+    if(!profileOf(me()).onboarded)openOnboarding('new',1,null);
+    else{const n=reqCount();if(n)toast(`Je hebt ${n} chatverzoek${n>1?'en':''}. Open Chat om te reageren.`)}
+  }
+}
