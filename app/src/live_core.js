@@ -108,17 +108,17 @@ function mapReview(x){
     text:x.body||'',tags:x.tags||[],vp:!!x.plate_verified,vh:!!x.photo_verified,likes:0,comments:[]};
 }
 const mapComment=c=>({id:c.id,uid:c.user_id,user:nameOf(c.user_id),text:c.body,ts:Date.parse(c.created_at)});
-const mapGarage=g=>({id:g.id,car:g.car_id,status:g.status,fuel:g.fuel,ver:g.version||'',year:g.year?String(g.year):'',vp:!!g.plate_verified,tags:g.tags||[]});
+const mapGarage=g=>({id:g.id,car:g.car_id,status:g.status,fuel:g.fuel,ver:g.version||'',year:g.year?String(g.year):'',vp:!!g.plate_verified,tags:g.tags||[],pos:g.position||0});
 const licOf=v=>v==='geen'?'geen':(v?+v:'');
 function profileFromRow(p){
   return {birthYear:p.birth_year||0,city:p.city||'',licenseSince:licOf(p.license_since),kmYear:p.km_year||'',bio:p.bio||'',interests:p.interests||[],avatar:p.avatar_url||'',
     vis:{age:p.share_age?'band':'hidden',loc:p.share_city?'city':'hidden',exp:p.share_experience?'shown':'hidden'},
-    profileVis:p.public_profile?'all':'members',chatFrom:p.chat_requests?'all':'none',onboarded:!!p.onboarded,garage:[]};
+    profileVis:p.public_profile?'all':'members',chatFrom:p.chat_requests?'all':'none',onboarded:!!p.onboarded,garage:[],garageOrder:p.garage_order||[]};
 }
 function profileFromCard(c){
   return {ageBand:c.age_band||'',city:c.city||'',licenseSince:licOf(c.license_since),kmYear:c.km_year||'',bio:c.bio||'',interests:c.interests||[],avatar:c.avatar_url||'',
     vis:{age:c.age_band?'band':'hidden',loc:c.city?'city':'hidden',exp:c.license_since||c.km_year?'shown':'hidden'},
-    profileVis:'all',chatFrom:c.chat_requests?'all':'none',onboarded:true,garage:[]};
+    profileVis:'all',chatFrom:c.chat_requests?'all':'none',onboarded:true,garage:[],garageOrder:c.garage_order||[]};
 }
 
 /* Modellen die alleen uit de RDW-import komen (nog niet in de ingebouwde catalogus) */
@@ -156,6 +156,7 @@ async function loadCommunity(){
     const a=store.accounts[LV.myRow.username.toLowerCase()];if(a)a.since=sinceText(LV.myRow.created_at);
   }
   garage.forEach(g=>{const n=LV.ids[g.user_id];if(!n||!carById(g.car_id))return;const p=store.profiles[n.username];if(p)p.garage.push(mapGarage(g))});
+  Object.values(store.profiles).forEach(p=>{if(p.garage)p.garage.sort((a,b)=>a.pos-b.pos)});
   const list=(revs||[]).filter(x=>carById(x.car_id)).map(mapReview);
   const ids=list.map(r=>r.id);
   const [likes,comments]=ids.length?await Promise.all([
@@ -479,3 +480,54 @@ function addCarFinder(p,onChange){
   res.addEventListener('click',e=>{const b=e.target.closest('[data-find]');if(b)pick(b.dataset.find)});
   inp.addEventListener('blur',()=>setTimeout(()=>{res.hidden=true},150));
 }
+
+
+/* ---------- Garage: volgorde van de groepen en van de auto's ---------- */
+const GGROUPS={nu:['Rijdt nu','Rijd ik nu'],gereden:['Gereden','Gereden'],gehad:['Heeft gehad','Heb ik gehad'],droom:['Droomauto’s','Droomauto’s']};
+const GDEFAULT=['nu','gereden','gehad','droom'];
+const gOrder=p=>{const o=(p.garageOrder||[]).filter(k=>GDEFAULT.includes(k));return o.concat(GDEFAULT.filter(k=>!o.includes(k)))};
+let gOrderOpen=false;
+function drivenCars(name){
+  const by={};
+  reviewsOf(name).forEach(r=>{const x=by[r.car]||(by[r.car]={car:r.car,n:0,sum:0,last:0,ver:false,rid:r.id});x.n++;x.sum+=r.overall;if(r.ts>x.last){x.last=r.ts;x.rid=r.id}if(isVer(r))x.ver=true});
+  return Object.values(by).sort((a,b)=>b.last-a.last);
+}
+function drivenItem(x){
+  const c=carById(x.car);if(!c)return '';
+  return `<div class="gitem">${carSvg(c,'mini')}<div class="gi"><div class="gt">${emblem(c.brand,'sm')}<button class="carlink sm" data-act="car" data-car="${esc(c.id)}">${esc(carName(c))}</button></div>
+    <small>${x.n} ${x.n===1?'check-in':'check-ins'} · laatst ${ago(x.last)}</small>${x.ver?'<span class="stamp ok">✓ Geverifieerd</span>':''}</div>${plate(Math.round(x.sum/x.n*10)/10)}</div>`;
+}
+function garageHtmlLive(p,own,name){
+  const driven=drivenCars(name);
+  const out=gOrder(p).map(k=>{
+    const t=GGROUPS[k][own?1:0];
+    if(k==='gereden')return driven.length?`<div class="ggroup"><h4>${t} (${driven.length})</h4><div class="gitems">${driven.map(drivenItem).join('')}</div></div>`:'';
+    const l=p.garage.filter(g=>g.status===k);
+    return l.length?`<div class="ggroup"><h4>${t}${k==='droom'?' (top '+l.length+')':''}</h4><div class="gitems">${l.map(g=>garageItem(g,own)).join('')}</div></div>`:'';
+  }).join('');
+  return out||`<div class="empty">${own?'Je garage is nog leeg. Voeg de auto’s toe die je rijdt, had of graag wilt hebben. Auto’s waarin je een check-in doet, komen er vanzelf bij.':'Nog geen auto’s in de garage.'}</div>`;
+}
+function garageOrderHtml(p){
+  const o=gOrder(p);
+  return `<details class="gorder"${gOrderOpen?' open':''}><summary>Volgorde aanpassen</summary><ol>${o.map((k,i)=>`<li><span>${GGROUPS[k][1]}</span><span class="gbtns"><button type="button" class="ghost sm" data-act="gord" data-k="${k}" data-d="-1" ${i===0?'disabled':''} aria-label="${GGROUPS[k][1]} omhoog">↑</button><button type="button" class="ghost sm" data-act="gord" data-k="${k}" data-d="1" ${i===o.length-1?'disabled':''} aria-label="${GGROUPS[k][1]} omlaag">↓</button></span></li>`).join('')}</ol>
+    <div class="row"><button type="button" class="plain" data-act="gordreset">Standaardvolgorde</button><small class="meta">Zo zien anderen je garage ook.</small></div></details>`;
+}
+async function saveGarageOrder(order){
+  const p=profileOf(me());const prev=p.garageOrder;
+  store.profiles[me()].garageOrder=order;gOrderOpen=true;render();
+  try{const rows=await rest('PATCH','profiles?id=eq.'+sbUid(),{garage_order:order},'return=representation');LV.myRow=rows[0]}
+  catch(e){store.profiles[me()].garageOrder=prev;render();toast('Opslaan lukte niet: '+e.message)}
+}
+function moveGroup(k,d){const o=gOrder(profileOf(me())),i=o.indexOf(k),j=i+d;if(i<0||j<0||j>=o.length)return;[o[i],o[j]]=[o[j],o[i]];saveGarageOrder(o)}
+/* Auto binnen dezelfde groep een plek omhoog of omlaag (in Garage beheren) */
+async function moveGarageItem(gid,d){
+  const g=ob.draft.garage,it=g.find(x=>x.id===gid);if(!it)return;
+  const same=g.filter(x=>x.status===it.status),i=same.indexOf(it),j=i+d;if(j<0||j>=same.length)return;
+  [same[i],same[j]]=[same[j],same[i]];
+  const order=['nu','gehad','droom'].flatMap(st=>st===it.status?same:g.filter(x=>x.status===st));
+  order.forEach((x,n)=>x.pos=n);ob.draft.garage=order;saveProfile(me(),{garage:order});
+  $('ob-glist').innerHTML=garageEditList(ob.draft);
+  try{await Promise.all(same.map(x=>rest('PATCH','garage_items?id=eq.'+encodeURIComponent(x.id),{position:x.pos})))}
+  catch(e){$('ga-err').textContent='Volgorde opslaan lukte niet: '+e.message}
+}
+document.addEventListener('toggle',e=>{if(e.target&&e.target.classList&&e.target.classList.contains('gorder'))gOrderOpen=e.target.open},true);
