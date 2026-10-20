@@ -462,7 +462,7 @@ async function rdwAutofillLive(p){
 }
 function showProofLive(p){
   const el=$(p+'-state'),raw=$(p+'-plate').value.trim(),f=$(p+'-photo').files[0];
-  if(!raw&&!f){el.innerHTML='Zonder bewijs is je check-in <b>niet geverifieerd</b>. Hij telt dan niet mee voor badges.';return}
+  if(!raw&&!f){el.innerHTML='';return}
   const out=[];
   if(raw){const pn=normPlate(raw);out.push(pn?`<span>Kenteken ${esc(pn.fmt)} wordt bij het plaatsen vergeleken met de RDW.</span>`:'<span class="warn">Dit kenteken lijkt niet op een Nederlands kenteken.</span>')}
   else out.push('<span>Vul ook het kenteken in, anders telt de foto niet mee.</span>');
