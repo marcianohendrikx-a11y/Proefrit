@@ -435,6 +435,9 @@ L = L.replace("Kies eerst het merk en het model.", "Zoek eerst de auto, of vul h
 
 L = rep(L, "Je kunt alle reviews, auto’s en openbare profielen bekijken. Een account heb je nodig om een check-in te plaatsen, te reageren of te chatten.", "Bekijk alles zonder account. Met een account plaats je check-ins, reageer je en chat je met andere rijders.")
 
+L = rep(L, "const rit=r.rit?` · gereden op ${new Date(r.rit+'T12:00:00').toLocaleDateString('nl-NL',{day:'numeric',month:'short'})}`:'';",
+        "const rit=r.rit?` · gereden op ${new Date(r.rit+'T12:00:00').toLocaleDateString('nl-NL',r.rit.slice(0,4)==String(YEAR)?{day:'numeric',month:'short'}:{day:'numeric',month:'short',year:'numeric'})}`:'';")
+
 # ---------- Start ----------
 s = L.index("/* ===== Start ===== */")
 L = L[:s] + core + "\n" + r"""

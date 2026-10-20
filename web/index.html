@@ -2949,7 +2949,7 @@ function stampHtml(r){
 }
 function reviewCard(r){
   const c=carOf(r),m=me(),liked=!!(m&&store.liked[m+':'+r.id]),cm=commentsOf(r),open=openThreads.has(r.id),own=!!m&&r.user===m;
-  const rit=r.rit?` · gereden op ${new Date(r.rit+'T12:00:00').toLocaleDateString('nl-NL',{day:'numeric',month:'short'})}`:'';
+  const rit=r.rit?` · gereden op ${new Date(r.rit+'T12:00:00').toLocaleDateString('nl-NL',r.rit.slice(0,4)==String(YEAR)?{day:'numeric',month:'short'}:{day:'numeric',month:'short',year:'numeric'})}`:'';
   return `<article class="card" id="rv-${esc(r.id)}">
     <div class="rvh"><button class="av" data-act="user" data-user="${esc(r.user)}" aria-label="Profiel van ${esc(r.user)}">${avIn(r.user)}</button>
       <div class="who2"><button class="ulink" data-act="user" data-user="${esc(r.user)}">${esc(r.user)}</button><span class="meta">${ago(r.ts)}${rit}</span></div>${stampHtml(r)}</div>
