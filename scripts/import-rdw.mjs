@@ -7,14 +7,14 @@
 //      in de catalogus (bron 'rdw'; brandstof volgt dan uit het kenteken bij de check-in).
 //
 // Gebruik:  node scripts/import-rdw.mjs [uitvoerbestand]
-// Omgeving: RDW_APP_TOKEN (optioneel, hogere limieten), MIN_VEHICLES (standaard 50),
+// Omgeving: RDW_APP_TOKEN (optioneel, hogere limieten), MIN_VEHICLES (standaard 200),
 //           RDW_FIXTURE (pad naar een JSON-bestand met rijen, alleen voor tests zonder internet).
 // Draait maandelijks via .github/workflows/import-rdw.yml.
 import fs from "node:fs";
 import path from "node:path";
 
 const OUT = process.argv[2] ?? path.join(path.dirname(new URL(import.meta.url).pathname), "..", "supabase", "seed", "rdw_models.sql");
-const MIN = Math.max(1, Number(process.env.MIN_VEHICLES ?? 50));
+const MIN = Math.max(1, Number(process.env.MIN_VEHICLES ?? 200));
 const PAGE = 50000;
 const URL_BASE = "https://opendata.rdw.nl/resource/m9d7-ebf2.json";
 
@@ -50,6 +50,19 @@ async function load() {
   return all;
 }
 
+// RDW-schrijfwijzen van merken die in onze catalogus anders heten (genormaliseerd: kleine letters, zonder leestekens).
+const BRAND_ALIAS = {
+  "bmw i": "BMW", "bmw alpina": "Alpina", "mercedes amg": "Mercedes-Benz", "mercedes benz": "Mercedes-Benz", "daimler benz": "Mercedes-Benz",
+  "tesla motors": "Tesla", "jaguar cars": "Jaguar", "jaguar land rover": "Jaguar", "de lorean": "DeLorean", "g m c": "GMC",
+  "n s u": "NSU", "ds automobiles": "DS", "automobili lamborghini s": "Lamborghini", "automobili lamborghini": "Lamborghini",
+  "micro compact car": "Smart", "micro compact car smart": "Smart", "mcc": "Smart", "lada vaz": "Lada", "vaz": "Lada",
+  "kg mobility": "SsangYong", "lucid motors": "Lucid", "vw": "Volkswagen", "vw porsche": "Porsche", "alpine renault": "Alpine",
+  "rolls royce motor cars": "Rolls-Royce", "aston martin lagonda": "Aston Martin", "great wall motor": "Great Wall",
+  "range rover": "Land Rover", "landrover": "Land Rover", "citroen": "Citroën", "skoda": "Škoda", "chevrolet daewoo": "Chevrolet",
+  "ford cng technik": "Ford", "ineos automotive": "INEOS", "lynk co": "Lynk & Co", "polestar automotive": "Polestar",
+};
+const normName = (s) => String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+
 const year = (v) => { const m = String(v ?? "").match(/^(\d{4})/); return m ? Number(m[1]) : null; };
 const clean = (s) => String(s ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
 const lit = (s) => (s == null ? "null" : `'${String(s).replace(/'/g, "''")}'`);
@@ -63,6 +76,8 @@ let sql = `set statement_timeout = 0;
 -- ${rows.length} combinaties van merk en handelsbenaming. Nieuwe modellen vanaf ${MIN} voertuigen.
 begin;
 create temp table rdw_in (brand text, trade_name text, first_year int, last_year int, vehicles int) on commit drop;
+create temp table alias (nb text primary key, brand text) on commit drop;
+insert into alias values ${Object.entries(BRAND_ALIAS).map(([k, v]) => `(${lit(k)},${lit(v)})`).join(",")};
 `;
 for (let i = 0; i < rows.length; i += 1000) {
   sql += "insert into rdw_in values\n" + rows.slice(i, i + 1000).map((r) => `(${lit(r.brand)},${lit(r.trade)},${r.first ?? "null"},${r.last ?? "null"},${r.n})`).join(",\n") + ";\n";
@@ -77,11 +92,13 @@ on conflict (brand, trade_name) do update set first_year = excluded.first_year, 
 -- 2. Voorstel: het langste model uit de catalogus waarmee de RDW-naam begint (ook met het merk ervoor),
 --    of 'C 200' -> 'C-Klasse'. Namen worden één keer genormaliseerd en per merk vergeleken (snel, ook bij 100.000 namen).
 create temp table rn on commit drop as
-  select brand, trade_name, public.norm_name(brand) nb, public.norm_name(trade_name) nt,
-         lower(substring(trade_name from '^([A-Za-z]{1,3}) ?[0-9]')) || ' klasse' as kl
-  from public.rdw_models where match <> 'zeker';
+  select r.brand, r.trade_name, coalesce(public.norm_name(a.brand), public.norm_name(r.brand)) nb, public.norm_name(r.trade_name) nt,
+         lower(substring(r.trade_name from '^([A-Za-z]{1,3}) ?[0-9]')) || ' klasse' as kl,
+         substring(public.norm_name(r.trade_name) from '^([1-8])[0-9]{2}') || ' serie' as bs,
+         replace(regexp_replace(regexp_replace(public.norm_name(r.trade_name), '^(amg|alfa|peugot|cupra|vw) ', ''), ' (series|reihe)( |$)', ' serie\\2'), ' ', '') as ntc
+  from public.rdw_models r left join alias a on a.nb = public.norm_name(r.brand) where r.match <> 'zeker';
 create temp table cn on commit drop as
-  select id, brand, model, public.norm_name(brand) nb, public.norm_name(model) nm from public.cars where source = 'catalogus';
+  select id, brand, model, public.norm_name(brand) nb, public.norm_name(model) nm, replace(public.norm_name(model), ' ', '') nmc from public.cars where source = 'catalogus';
 create index on rn (nb);
 create index on cn (nb);
 analyze rn; analyze cn;
@@ -89,22 +106,32 @@ with m as (
   select distinct on (rn.brand, rn.trade_name) rn.brand, rn.trade_name, cn.id
   from rn join cn on cn.nb = rn.nb
   where rn.nt = cn.nm or rn.nt like cn.nm || ' %' or rn.nt = cn.nb || ' ' || cn.nm
-     or rn.nt like cn.nb || ' ' || cn.nm || ' %' or cn.nm = rn.kl
-  order by rn.brand, rn.trade_name, length(cn.model) desc)
+     or rn.nt like cn.nb || ' ' || cn.nm || ' %' or cn.nm = rn.kl or cn.nm = rn.bs
+     or (length(cn.nmc) >= 2 and (rn.ntc = cn.nmc or rn.ntc like cn.nmc || '%'))
+  order by rn.brand, rn.trade_name, (rn.nt = cn.nm or rn.ntc = cn.nmc) desc, length(cn.model) desc)
 update public.rdw_models r set car_id = m.id, match = 'voorstel' from m
 where r.brand = m.brand and r.trade_name = m.trade_name and r.car_id is distinct from m.id;
 
--- 3. Nieuwe modellen voor RDW-namen zonder voorstel, met genoeg voertuigen. Bestaat het merk al,
---    dan krijgt het model diens schrijfwijze; anders hoofdletters zoals initcap ze zet.
+-- 3. Nieuwe modellen voor RDW-namen zonder voorstel. Streng, want de RDW kent ook typecodes ('111011', '1j'),
+--    campers, bestelversies en namen met motorvermogen. Alleen voor merken die al in de catalogus staan,
+--    met minstens ${MIN} voertuigen en een gewone modelnaam.
 create temp table bm on commit drop as
   select distinct on (public.norm_name(brand)) public.norm_name(brand) nb, brand from public.cars
-  order by public.norm_name(brand), (source = 'catalogus') desc, brand;
+  where source = 'catalogus' order by public.norm_name(brand), brand;
 create temp table nieuw on commit drop as
   select r.brand, r.trade_name, r.first_year, r.last_year,
-         coalesce(bm.brand, initcap(r.brand)) || '|' || initcap(r.trade_name) as car_id,
-         coalesce(bm.brand, initcap(r.brand)) as nice_brand
-  from public.rdw_models r left join bm on bm.nb = public.norm_name(r.brand)
-  where r.car_id is null and r.vehicles >= ${MIN} and r.first_year is not null;
+         bm.brand || '|' || initcap(r.trade_name) as car_id, bm.brand as nice_brand
+  from public.rdw_models r
+  join rn on rn.brand = r.brand and rn.trade_name = r.trade_name
+  join bm on bm.nb = rn.nb
+  where r.car_id is null and r.vehicles >= ${MIN} and r.first_year is not null
+    and rn.nt ~ '[a-z]'                                   -- niet alleen cijfers
+    and rn.nt !~ '^[0-9]+[a-z]+[0-9a-z]*( |$)'            -- geen typecodes zoals 1j, 7dw, 70x0b
+    and rn.nt !~ '^[0-9]{4,}'                             -- geen typenummers zoals 171021
+    and rn.trade_name !~ '^[^A-Za-z0-9]' and rn.trade_name !~ '[*?]'   -- geen tekens vooraan, geen sterretjes
+    and rn.nt !~ '(kampeer|camper|camping|wohnmobil|reisemobil|motorhome|bestel|ambulance|lijkwagen|rouw|taxi|politie|brandweer)'
+    and rn.nt !~ '[0-9] ?(kw|pk)( |$)|( |^)(tdi|tsi|cdi|hdi|dci|crdi|tdci|automatic|automaat|aut)( |$)'
+    and rn.nt <> rn.nb and rn.nt not like rn.nb || ' %';
 with ins as (
   insert into public.cars (id, brand, model, year_from, year_to, body, fuels, source)
   select distinct on (n.car_id) n.car_id, n.nice_brand, initcap(n.trade_name), n.first_year,

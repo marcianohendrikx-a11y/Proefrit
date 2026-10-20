@@ -381,6 +381,11 @@ L = rep(L, "  else if(a==='export')exportMyData(t);", """  else if(a==='export')
 L = rep(L, "  if(cb)cb();else if(n)toast(`Je hebt ${n} chatverzoek${n>1?'en':''}. Open Chat om te reageren.`);",
         "  if(cb)cb();else if(n)toast(`Je hebt ${n} chatverzoek${n>1?'en':''}. Open Chat om te reageren.`);\n  checkTicketReplies();")
 
+# ---------- Modellen uit de RDW-import: brandstof is per kenteken verschillend ----------
+L = rep(L, "${c.fuels.join(', ')}", "${c.rdw?'Brandstof volgens kenteken':c.fuels.join(', ')}", 2)
+L = rep(L, "c.fuels.map(fuelLabel).join(', ')", "(c.rdw?'Brandstof volgens kenteken':c.fuels.map(fuelLabel).join(', '))")
+L = rep(L, "const fuelMatch=(c,f)=>f==='Alle'||", "const fuelMatch=(c,f)=>f==='Alle'||!c.rdw&&")
+
 # ---------- Start ----------
 s = L.index("/* ===== Start ===== */")
 L = L[:s] + core + "\n" + r"""
