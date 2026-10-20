@@ -3846,7 +3846,6 @@ const ticketRow=(t,owner)=>{
     <label class="vh" for="tr-${esc(t._doc)}">Antwoord op ${esc(t.id)}</label><textarea id="tr-${esc(t._doc)}" class="field" rows="3" maxlength="2000" placeholder="${t.reply?'Nieuw antwoord (vervangt het vorige)':'Schrijf een antwoord. De melder ziet het in de app bij Jouw meldingen.'}"></textarea>
     <div class="row" style="justify-content:space-between"><button type="button" class="ghost sm" data-act="treply" data-doc="${esc(t._doc)}">Antwoord versturen</button><button type="button" class="plain" data-act="tstatus" data-doc="${esc(t._doc)}" data-id="${esc(t.id)}" data-status="${t.status==='Afgehandeld'?'Ontvangen':'Afgehandeld'}">${t.status==='Afgehandeld'?'Heropenen':'Afhandelen zonder antwoord'}</button></div></div>`;
 };
-  <span style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none"><small>${esc(t.status||'Ontvangen')}</small>${owner?`<button type="button" class="plain" data-act="tstatus" data-doc="${esc(t._doc)}" data-id="${esc(t.id)}" data-status="${t.status==='Afgehandeld'?'Ontvangen':'Afgehandeld'}">${t.status==='Afgehandeld'?'Heropenen':'Afhandelen'}</button>`:''}</span></div>`;
 async function renderTickets(){
   const who=me()||'Gast',el=$('fb-list');
   const mineL=store.tickets.filter(t=>t.user===who).concat((await ownServerTickets()).filter(t=>t.user===who));

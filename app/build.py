@@ -355,7 +355,7 @@ L = rep(L, "  else if(a==='export')exportMyData(t);", """  else if(a==='export')
   }""")
 
 # ---------- Tickets beantwoorden in de app ----------
-_tr0 = L.index("const ticketRow=(t,owner)=>"); _tr1 = L.index("\n", _tr0)
+_tr0 = L.index("const ticketRow=(t,owner)=>"); _tr1 = L.index("</span></div>`;\n", _tr0) + len("</span></div>`;")
 L = L[:_tr0] + r"""const ticketRow=(t,owner)=>{
   const head=`<b>${esc(t.id)}</b> · ${esc(t.type)} · <small>${esc(t.status||'Ontvangen')}</small>${t.ts?` · <small>${new Date(t.ts).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})}</small>`:''}`;
   const rep=t.reply?`<div class="treply"><b>Antwoord van het team</b>${t.repliedAt?` <small>(${new Date(t.repliedAt).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})})</small>`:''}<br>${esc(t.reply)}</div>`:'';
