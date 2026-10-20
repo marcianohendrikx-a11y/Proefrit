@@ -224,7 +224,7 @@ L = repfn(L, 'setTicketStatus', """async function setTicketStatus(doc,id,status)
   try{await rest('PATCH','tickets?id=eq.'+encodeURIComponent(doc),{status})}catch(e){toast('Bijwerken lukte niet: '+e.message)}
   await loadInbox();renderTickets();render();
 }""")
-L = rep(L, "const a=me()?accountOf(me()):null;$('fb-mail').value=a?a.email:'';", "$('fb-mail').value=me()?LV.email:'';")
+L = rep(L, "const a=me()?accountOf(me()):null;$('fb-mail').value=a?a.email:'';", "$('fb-mail').value='';$('fb-mail').parentElement.hidden=!!me();")
 L = rep(L, "$('fb-where').textContent=DB?", "$('fb-where').textContent=true?")
 L = rep(L, "'Je melding gaat als ticket naar een afgeschermde inbox die alleen het Proefrit-team kan lezen. In de echte app krijgt het team er ook direct een e-mail van.'",
         "(me()?'Je melding gaat naar het Proefrit-team. Het antwoord zie je hier onder Jouw meldingen.':'Je melding gaat naar het Proefrit-team. Je hebt geen account, dus vul je e-mailadres in als je een antwoord wilt.')")

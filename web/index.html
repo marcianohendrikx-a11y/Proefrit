@@ -3858,7 +3858,7 @@ async function renderTickets(){
 }
 function openFeedback(){
   $('fbform').reset();$('fb-err').textContent='';
-  $('fb-mail').value=me()?LV.email:'';
+  $('fb-mail').value='';$('fb-mail').parentElement.hidden=!!me();
   $('fb-where').textContent=true?(me()?'Je melding gaat naar het Proefrit-team. Het antwoord zie je hier onder Jouw meldingen.':'Je melding gaat naar het Proefrit-team. Je hebt geen account, dus vul je e-mailadres in als je een antwoord wilt.'):'Je melding wordt een ticket. Hier is geen verbinding met de inbox, dus het ticket blijft voorlopig in deze browser.';
   if(!fdlg.open)fdlg.showModal();
   renderTickets();

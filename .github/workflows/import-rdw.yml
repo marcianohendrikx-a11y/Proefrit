@@ -24,7 +24,7 @@ jobs:
       - name: RDW ophalen en SQL maken
         env:
           RDW_APP_TOKEN: ${{ secrets.RDW_APP_TOKEN }}
-          MIN_VEHICLES: ${{ github.event.inputs.min_vehicles || '50' }}
+          MIN_VEHICLES: ${{ github.event.inputs.min_vehicles || '200' }}
         run: node scripts/import-rdw.mjs rdw_models.sql
       - name: In de database zetten
         env:
