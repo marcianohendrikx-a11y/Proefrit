@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacyverklaring · Proefrit</title>
+<meta name="description" content="Welke gegevens Proefrit bewaart, waarom, en wat je rechten zijn.">
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>
+:root{--bg:#f4f6f9;--card:#ffffff;--fg:#15181d;--muted:#5a6472;--line:#d8dee6;--accent:#0b3f93;--plate:#f9c800;--ink:#0d1b2e}
+@media (prefers-color-scheme:dark){:root{--bg:#0f141b;--card:#171e27;--fg:#e8edf3;--muted:#9aa6b4;--line:#2a3441;--accent:#8db4ff}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 Barlow,system-ui,-apple-system,"Segoe UI",sans-serif}
+header{background:var(--ink);border-bottom:4px solid var(--plate);padding:14px 16px}
+.lp{display:inline-flex;align-items:stretch;background:var(--plate);border:2px solid #15181d;border-radius:5px;overflow:hidden;text-decoration:none;color:#15181d}
+.lp i{background:#0b3f93;color:#fff;font:600 11px/1 Barlow,sans-serif;font-style:normal;padding:6px 5px;display:flex;align-items:flex-end}
+.lp b{font:700 20px/1 "Barlow Condensed",Barlow,sans-serif;letter-spacing:.12em;padding:6px 10px}
+main{max-width:720px;margin:0 auto;padding:24px 16px 48px}
+h1{font:700 34px/1.1 "Barlow Condensed",Barlow,sans-serif;letter-spacing:.02em;margin:0 0 6px}
+h2{font:700 22px/1.2 "Barlow Condensed",Barlow,sans-serif;letter-spacing:.03em;margin:28px 0 6px}
+.sub{color:var(--muted);margin:0 0 18px}
+a{color:var(--accent)}
+table{width:100%;border-collapse:collapse;margin:8px 0;font-size:15px;background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{font-weight:600;width:34%}
+tr:last-child th,tr:last-child td{border-bottom:0}
+.box{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0}
+ul{padding-left:20px}
+li{margin:4px 0}
+@media (max-width:520px){table,tbody,tr,th,td{display:block;width:100%}th{border-bottom:0;padding-bottom:0}}
+</style>
+</head>
+<body>
+<header><a class="lp" href="./"><i>NL</i><b>PROEFRIT</b></a></header>
+<main>
+<h1>Privacyverklaring</h1>
+<p class="sub">Versie van 20 oktober 2026. Proefrit is in een testfase; deze verklaring wordt bijgewerkt als er iets verandert.</p>
+
+<div class="box">In het kort: je kunt Proefrit zonder account bekijken. Met een account bewaren we alleen wat nodig is om reviews, je profiel en chats te laten werken. Je e-mailadres ziet niemand anders. We plaatsen geen advertenties, verkopen niets door en gebruiken geen trackingcookies. Je kunt je gegevens altijd downloaden en je account zelf verwijderen.</div>
+
+<h2>Wie is verantwoordelijk?</h2>
+<p>Proefrit wordt gemaakt en beheerd door een particuliere ontwikkelaar. Vragen over je gegevens of een verzoek over je rechten stuur je via <b>Opmerking over de website plaatsen</b> onderaan elke pagina van de app. Vul je e-mailadres in als je antwoord wilt; we gebruiken het alleen om je melding te beantwoorden.</p>
+
+<h2>Welke gegevens en waarom</h2>
+<table>
+<tr><th>Account</th><td>E-mailadres en wachtwoord (versleuteld opgeslagen), of je Google-account als je daarmee inlogt. Nodig om in te loggen.</td></tr>
+<tr><th>Profiel</th><td>Gebruikersnaam en geboortejaar (verplicht, om te controleren dat je 16 jaar of ouder bent). Optioneel: profielfoto, woonplaats, rijbewijs sinds, kilometers per jaar, bio en interesses. Je kiest zelf of anderen je leeftijdsgroep, woonplaats en rijervaring zien; standaard staat alles uit. Je geboortejaar laten we nooit zien.</td></tr>
+<tr><th>Garage en check-ins</th><td>De auto’s die je toevoegt, je scores, teksten, kenmerken, ritdatum en hoe je in de auto kwam. Check-ins en je gebruikersnaam zijn openbaar; daar is Proefrit voor.</td></tr>
+<tr><th>Kenteken</th><td>Als je een kenteken invult, vragen we bij de open data van de RDW op welk merk, model, brandstof en bouwjaar erbij horen. We bewaren het kenteken niet zelf, alleen een versleutelde code (HMAC). Daarmee voorkomen we dat hetzelfde kenteken misbruikt wordt voor nepreviews. Het kenteken wordt nooit getoond.</td></tr>
+<tr><th>Bewijsfoto</th><td>Een foto die je toevoegt als bewijs, laten we door Claude (Anthropic) lezen om het kenteken te vergelijken. Die foto bewaren we niet; we bewaren alleen een code (hash) om te zien of dezelfde foto al eens is gebruikt.</td></tr>
+<tr><th>Foto’s bij een auto</th><td>Foto’s die je zelf instuurt voor een autopagina. Claude controleert ze eerst en zoekt kentekens, die de app onherkenbaar maakt. Daarna keurt een beheerder de foto. Pas na goedkeuring is hij openbaar, met je gebruikersnaam erbij.</td></tr>
+<tr><th>Reacties, Top! en chat</th><td>Je reacties en Top!’s zijn openbaar. Chatberichten zien alleen jij en de ander. Een gesprek start pas als de ander akkoord geeft. Beheerders lezen chats niet mee.</td></tr>
+<tr><th>Meldingen</th><td>Wat je invult bij een opmerking over de website, de pagina waar je was en eventueel je e-mailadres voor een antwoord. De melding gaat ook als e-mail naar het team.</td></tr>
+<tr><th>Woordfilter</th><td>Teksten worden automatisch gecontroleerd op scheldwoorden. Een tekst die wordt tegengehouden, bewaren we niet.</td></tr>
+<tr><th>Technisch</th><td>Je browser bewaart je inlogsessie in lokale opslag, zodat je ingelogd blijft. Er zijn geen tracking- of advertentiecookies. Onze hosting- en databasediensten houden voor beveiliging tijdelijk technische logs bij, zoals IP-adressen.</td></tr>
+</table>
+
+<h2>Grondslag</h2>
+<ul>
+<li><b>Uitvoeren van de dienst</b> (art. 6 lid 1b AVG): account, profiel, check-ins, chat en meldingen.</li>
+<li><b>Gerechtvaardigd belang</b> (art. 6 lid 1f AVG): kenteken- en fotocontrole tegen nepreviews, het woordfilter, de keuring van foto’s en de beveiliging van de dienst.</li>
+<li><b>Jouw keuze</b>: wat je extra op je profiel deelt. Je zet het op elk moment weer uit via Profiel bewerken.</li>
+</ul>
+
+<h2>Wie helpt ons (verwerkers)</h2>
+<table>
+<tr><th>Supabase</th><td>Database, inloggen, opslag van foto’s en de serverfuncties. Tijdens de testfase staan de servers in de Verenigde Staten. De doorgifte is geregeld met de verwerkersovereenkomst van Supabase, met de standaardcontractbepalingen van de Europese Commissie.</td></tr>
+<tr><th>Google</th><td>Alleen als je kiest voor Inloggen met Google. Google ziet dan dat je inlogt bij Proefrit.</td></tr>
+<tr><th>Anthropic (Claude)</th><td>Leest bewijsfoto’s en controleert foto’s voor autopagina’s. Volgens de zakelijke voorwaarden van Anthropic worden deze foto’s niet gebruikt om modellen te trainen.</td></tr>
+<tr><th>Resend</th><td>Verstuurt meldingen over de website als e-mail naar het team.</td></tr>
+<tr><th>RDW</th><td>Bij de RDW zoeken we op welke auto bij een kenteken hoort. Dit is openbare informatie. De RDW krijgt niet te zien wie de vraag stelt.</td></tr>
+<tr><th>GitHub</th><td>Host de webpagina’s van Proefrit (GitHub Pages).</td></tr>
+</table>
+
+<h2>Hoe lang</h2>
+<ul>
+<li>Je account en alles wat je plaatst bewaren we tot je je account verwijdert. Je kunt ook losse check-ins en reacties verwijderen.</li>
+<li>Meldingen bewaren we tot ze zijn afgehandeld en daarna nog maximaal 12 maanden.</li>
+<li>Verwijder je je account, dan verwijderen we je profiel, garage, check-ins, reacties, Top!’s, chats, ingestuurde foto’s, profielfoto’s en meldingen. Back-ups van de database worden na korte tijd overschreven.</li>
+</ul>
+
+<h2>Je rechten</h2>
+<p>Je mag je gegevens inzien, laten verbeteren, laten verwijderen, de verwerking laten beperken, bezwaar maken en je gegevens meenemen. Veel kun je zelf doen:</p>
+<ul>
+<li><b>Inzien en meenemen:</b> Profiel → Je account → <i>Mijn gegevens downloaden</i>. Je krijgt een bestand met alles wat we over je account bewaren.</li>
+<li><b>Verbeteren:</b> Profiel → <i>Profiel bewerken</i>.</li>
+<li><b>Verwijderen:</b> Profiel → Je account → <i>Account verwijderen</i>.</li>
+</ul>
+<p>Voor andere verzoeken gebruik je <b>Opmerking over de website plaatsen</b>. We reageren binnen een maand. Ben je het niet eens met hoe we met je gegevens omgaan? Dan kun je een klacht indienen bij de <a href="https://www.autoriteitpersoonsgegevens.nl" target="_blank" rel="noopener">Autoriteit Persoonsgegevens</a>.</p>
+
+<h2>Leeftijd</h2>
+<p>Je hebt een account nodig om iets te plaatsen. Een account kun je maken vanaf 16 jaar. Rondkijken kan op elke leeftijd.</p>
+
+<p style="margin-top:32px"><a href="./">← Terug naar Proefrit</a></p>
+</main>
+</body>
+</html>

@@ -19,6 +19,6 @@ jobs:
         with:
           version: latest
       - run: |
-          for f in checkin add-proof rdw-lookup garage-plate ticket photo photo-moderate; do
+          for f in checkin add-proof rdw-lookup garage-plate ticket photo photo-moderate delete-account; do
             supabase functions deploy "$f" --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
           done

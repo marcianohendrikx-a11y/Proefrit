@@ -20,6 +20,14 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - name: Lettertypen zelf hosten (geen verbinding met Google Fonts nodig)
+        run: |
+          set -e
+          mkdir -p web/fonts /tmp/f && cd /tmp/f
+          npm pack @fontsource/barlow@5 @fontsource/barlow-condensed@5 --silent
+          for p in barlow barlow-condensed; do mkdir -p "$GITHUB_WORKSPACE/web/fonts/$p" && tar -xzf fontsource-$p-*.tgz -C "$GITHUB_WORKSPACE/web/fonts/$p" --strip-components=1 package/files package/400.css package/500.css package/600.css package/700.css 2>/dev/null || tar -xzf fontsource-$p-*.tgz -C "$GITHUB_WORKSPACE/web/fonts/$p" --strip-components=1; done
+          printf '@import url("barlow/400.css");\n@import url("barlow/500.css");\n@import url("barlow/600.css");\n@import url("barlow-condensed/600.css");\n@import url("barlow-condensed/700.css");\n' > "$GITHUB_WORKSPACE/web/fonts/fonts.css"
+          ls "$GITHUB_WORKSPACE/web/fonts/barlow" | head
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

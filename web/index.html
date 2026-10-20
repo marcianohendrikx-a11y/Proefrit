@@ -8,7 +8,7 @@
 <script>window.PROEFRIT_CONFIG={"url": "https://pijpamspureonpbsrwoz.supabase.co", "key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpanBhbXNwdXJlb25wYnNyd296Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0NDQwMTcsImV4cCI6MjEwODAyMDAxN30.ZQLoIvP8gXMGeHHu4I4vG3JMxF_OHpoBO5D2OpcXvXo"};</script>
 <title>Proefrit</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap">
+<link rel="stylesheet" href="fonts/fonts.css">
 <style>
 /* Layout: donkere asfaltkop met kentekenlogo en gele weglijn, smalle kolom, vaste onderbalk met plaatvormige check-inknop. Kentekengeel markeert scores en acties. */
 :root{
@@ -487,6 +487,8 @@ textarea.field{min-height:96px;resize:vertical}
 /* verborgen badges */
 .tier.th{background:#7b51d6;color:#fff}
 .badge.secret strong{color:var(--muted)}
+.cta.danger{background:#c62828;color:#fff;border-color:#7f1515}
+.plain.delbtn{color:var(--muted);font-size:13px}
 </style>
 <header class="top gut">
   <div class="wrap topbar">
@@ -539,7 +541,7 @@ textarea.field{min-height:96px;resize:vertical}
       <button class="cta" id="authsubmit" type="submit">Inloggen</button>
     </form>
     <button class="plain g-in" type="button" data-act="forgot" style="align-self:flex-start">Wachtwoord vergeten?</button>
-    <p class="explain">Je e-mailadres laten we nooit aan andere leden zien. Wat je deelt op je profiel, kies je zelf.</p>
+    <p class="explain">Je e-mailadres laten we nooit aan andere leden zien. Wat je deelt op je profiel, kies je zelf. Lees ook de <a href="privacy.html" target="_blank" rel="noopener">privacyverklaring</a>.</p>
   </div>
 </dialog>
 
@@ -2871,7 +2873,7 @@ function reviewCard(r){
     <div class="actions">
       <button class="pill" data-act="like" data-id="${esc(r.id)}" aria-pressed="${liked}">Top! ${(r.likes||0)+(liked?1:0)}</button>
       <button class="pill" data-act="comments" data-id="${esc(r.id)}" aria-expanded="${open}">Reageer${cm.length?' ('+cm.length+')':''}</button>
-      ${own&&vfOf(r)<2?`<button class="pill add" data-act="addproof" data-id="${esc(r.id)}">Bewijs toevoegen</button>`:''}
+      ${own&&vfOf(r)<2?`<button class="pill add" data-act="addproof" data-id="${esc(r.id)}">Bewijs toevoegen</button>`:''}${own||OWNER?`<button class="plain delbtn" data-act="delrev" data-id="${esc(r.id)}">Verwijderen</button>`:''}
     </div>
     ${open?threadHtml(r,cm):''}
   </article>`;
@@ -2879,7 +2881,7 @@ function reviewCard(r){
 function threadHtml(r,cm){
   return `<div class="thread">
     ${cm.length?`<ul class="comments">${cm.map(c=>`<li><button class="av sm" data-act="user" data-user="${esc(c.user)}" aria-label="Profiel van ${esc(c.user)}">${avIn(c.user)}</button>
-      <div><div class="meta"><button class="ulink" data-act="user" data-user="${esc(c.user)}">${esc(c.user)}</button> · ${ago(c.ts)}</div><p>${esc(c.text)}</p></div></li>`).join('')}</ul>`:'<p class="meta" style="margin:0">Nog geen reacties.</p>'}
+      <div><div class="meta"><button class="ulink" data-act="user" data-user="${esc(c.user)}">${esc(c.user)}</button> · ${ago(c.ts)}${me()&&(c.user===me()||OWNER)?` · <button class="plain delbtn" data-act="delcm" data-id="${esc(c.id)}" data-rid="${esc(r.id)}">Verwijderen</button>`:''}</div><p>${esc(c.text)}</p></div></li>`).join('')}</ul>`:'<p class="meta" style="margin:0">Nog geen reacties.</p>'}
     ${me()?`<form class="cform" data-rid="${esc(r.id)}" novalidate>
       <label class="vh" for="cm-${esc(r.id)}">Je reactie</label>
       <input id="cm-${esc(r.id)}" class="field" maxlength="300" placeholder="Schrijf een reactie…" autocomplete="off">
@@ -2894,7 +2896,7 @@ function refreshCard(id,focus){
 }
 function siteFoot(){
   const n=OWNER&&inbox?inbox.filter(t=>t.status!=='Afgehandeld').length:0;
-  return `<div class="sitefoot"><span>Iets gezien dat niet klopt?</span><button class="plain" data-act="feedback">Opmerking over de website plaatsen</button>${OWNER?`<button class="plain" data-act="feedback">Ticket-inbox${inbox?' ('+n+' open)':''}</button><button class="plain" data-act="modq">Fotokeuring${modq?' ('+modq.length+')':''}</button>`:''}${me()?'<button class="plain" data-act="logout">Uitloggen</button>':'<button class="plain" data-act="auth" data-mode="in">Inloggen</button>'}<span class="credit">Catalogus deels op basis van <a href="https://github.com/abhionlyone/us-car-models-data" target="_blank" rel="noopener">US Car Models Data</a> (CC BY 4.0). Merkplaatjes en illustraties zijn eigen ontwerp; merknamen zijn van hun eigenaren. Foto’s van rijders zijn van de makers en worden pas na keuring getoond. Woordfilter deels op basis van <a href="https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words" target="_blank" rel="noopener">LDNOOBW</a> (CC BY 4.0).</span></div>`;
+  return `<div class="sitefoot"><span>Iets gezien dat niet klopt?</span><button class="plain" data-act="feedback">Opmerking over de website plaatsen</button>${OWNER?`<button class="plain" data-act="feedback">Ticket-inbox${inbox?' ('+n+' open)':''}</button><button class="plain" data-act="modq">Fotokeuring${modq?' ('+modq.length+')':''}</button>`:''}${me()?'<button class="plain" data-act="logout">Uitloggen</button>':'<button class="plain" data-act="auth" data-mode="in">Inloggen</button>'}<span class="credit">Catalogus deels op basis van <a href="https://github.com/abhionlyone/us-car-models-data" target="_blank" rel="noopener">US Car Models Data</a> (CC BY 4.0). Merkplaatjes en illustraties zijn eigen ontwerp; merknamen zijn van hun eigenaren. Foto’s van rijders zijn van de makers en worden pas na keuring getoond. Woordfilter deels op basis van <a href="https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words" target="_blank" rel="noopener">LDNOOBW</a> (CC BY 4.0). <a href="privacy.html">Privacyverklaring</a>.</span></div>`;
 }
 const gate=(title,text)=>`<div class="card gate"><h2>${title}</h2><p>${text}</p><div class="row"><button class="cta" data-act="auth" data-mode="up" data-reason="${esc(text)}">Account maken</button><button class="ghost" data-act="auth" data-mode="in" data-reason="${esc(text)}">Inloggen</button></div></div>`;
 
@@ -3038,7 +3040,7 @@ function renderProfile(name){
   <p class="explain" style="margin:-6px 0 0">Badges tellen alleen geverifieerde check-ins, met kenteken én foto. ${BADGES.filter(b=>b.hidden).length} badges zijn verborgen: die ontdek je door te rijden.</p>
   ${self?`<div class="badges">${bs.map(x=>badgeCard(x,true)).join('')}</div>`
         :(earned.length?`<div class="badges compact">${earned.map(x=>badgeCard(x,false)).join('')}</div>`:'<div class="empty">Nog geen badges behaald.</div>')}</div>
-  <div class="section"><h3>${self?'Jouw check-ins':'Check-ins van '+esc(name)}</h3><div class="list">${l.map(reviewCard).join('')||`<div class="empty">${self?'Je hebt nog niets gecheckt. Tik op + Check-in om te beginnen.':'Nog geen check-ins.'}</div>`}</div></div>`;
+  <div class="section"><h3>${self?'Jouw check-ins':'Check-ins van '+esc(name)}</h3><div class="list">${l.map(reviewCard).join('')||`<div class="empty">${self?'Je hebt nog niets gecheckt. Tik op + Check-in om te beginnen.':'Nog geen check-ins.'}</div>`}</div></div>${self?`<div class="section"><h3 style="margin:0">Je account</h3><p class="explain" style="margin:0">Ingelogd als ${esc(LV.email||'')}. Je e-mailadres ziet niemand anders.</p><div class="row"><button class="ghost sm" data-act="export">Mijn gegevens downloaden</button><button class="ghost sm" data-act="delacct">Account verwijderen</button></div><p class="explain" style="margin:0">Lees in de <a href="privacy.html">privacyverklaring</a> wat we bewaren en waarom.</p></div>`:''}`;
 }
 
 /* ===== Chat met akkoord ===== */
@@ -4145,6 +4147,17 @@ document.addEventListener('click',e=>{
   else if(a==='social'&&t.dataset.provider==='Google')googleLogin();
   else if(a==='forgot')forgotPassword();
   else if(a==='reload')reloadAll();
+  else if(a==='export')exportMyData(t);
+  else if(a==='delrev'||a==='delcm'){
+    if(t.dataset.sure!=='1'){t.dataset.sure='1';t.textContent='Echt verwijderen?';return}
+    t.disabled=true;const id=t.dataset.id;
+    rest('DELETE',(a==='delrev'?'reviews':'comments')+'?id=eq.'+encodeURIComponent(id)+'&select=id',undefined,'return=representation').then(rows=>{
+      if(!rows||!rows.length)throw new Error('Dat mag niet met je account.');
+      if(a==='delrev'){const i=SEED.findIndex(x=>x.id===id);if(i>=0)SEED.splice(i,1);render();toast('Check-in verwijderd.')}
+      else{const r=reviewById(t.dataset.rid);if(r)r.comments=r.comments.filter(c=>c.id!==id);refreshCard(t.dataset.rid);toast('Reactie verwijderd.')}
+    }).catch(x=>{t.disabled=false;toast(x.message)});
+  }
+  else if(a==='delacct')openDeleteDialog();
   else if(a==='ucancel'){udlgDone=true;udlg.close();if(udlgMode==='name')signOut(true)}
   else if(a==='social'){const n=$('soc-note');n.hidden=false;n.textContent=`Inloggen met ${t.dataset.provider} werkt pas in de echte app, omdat daarvoor een koppeling met een inlogdienst nodig is. Maak nu een account met je e-mailadres of probeer het demo-account.`}
   else if(a==='chat'){
@@ -4550,6 +4563,11 @@ udlg.addEventListener('submit',async e=>{
   e.preventDefault();const err=$('u-err'),btn=e.target.querySelector('button.cta');err.textContent='';
   try{
     btn.disabled=true;
+    if(udlgMode==='del'){
+      const v=$('u-confirm').value.trim();
+      if(v.toLowerCase()!==me().toLowerCase()){err.textContent='Typ je gebruikersnaam precies over om te bevestigen.';return}
+      await deleteAccount(v);udlgDone=true;udlg.close();return;
+    }
     if(udlgMode==='pw'){
       const pw=$('u-pw').value;if(pw.length<8){err.textContent='Kies een wachtwoord van minstens 8 tekens.';return}
       const r=await sbFetch(SB.url+'/auth/v1/user',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
@@ -4609,6 +4627,43 @@ async function boot(){
     if(!profileOf(me()).onboarded)openOnboarding('new',1,null);
     else{const n=reqCount();if(n)toast(`Je hebt ${n} chatverzoek${n>1?'en':''}. Open Chat om te reageren.`)}
   }
+}
+
+/* ---------- Je eigen gegevens (AVG): downloaden en account verwijderen ---------- */
+async function exportMyData(btn){
+  const uid=sbUid();if(!uid)return;
+  if(btn)btn.disabled=true;
+  try{
+    const q=(t,f)=>rest('GET',`${t}?select=*&${f||'user_id'}=eq.${uid}`).catch(()=>[]);
+    const [profiel,garage,checkins,reacties,tops,tickets,fotos,gesprekken]=await Promise.all([
+      q('profiles','id'),q('garage_items'),q('reviews'),q('comments'),q('likes'),q('tickets'),q('photo_submissions'),rest('GET','conversations?select=*').catch(()=>[])]);
+    const berichten=gesprekken.length?await restIn('messages','*','conversation_id',gesprekken.map(c=>c.id)).catch(()=>[]):[];
+    const data={uitgifte:new Date().toISOString(),uitleg:'Alle gegevens die Proefrit over je account bewaart. Van gesprekken staan ook de berichten van de ander erbij, omdat die bij het gesprek horen.',
+      account:{email:LV.email},profiel,garage,checkins,reacties,top:tops,gesprekken,berichten,tickets,fotos};
+    const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+    const a=document.createElement('a');a.href=url;a.download=`proefrit-gegevens-${me()}.json`;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),5000);
+    toast('Je gegevens zijn gedownload als bestand.');
+  }catch(e){toast('Downloaden lukte niet: '+e.message)}
+  finally{if(btn)btn.disabled=false}
+}
+function openDeleteDialog(){
+  udlgMode='del';udlgDone=false;
+  $('ubox').innerHTML=`<div class="fh"><span class="lp"><i aria-hidden="true">NL</i><b>PROEFRIT</b></span><button type="button" class="x" data-act="ucancel" aria-label="Sluiten">×</button></div>
+    <div><h2 id="utitle">Account verwijderen</h2><p class="sub" style="margin:0">Dit kan niet ongedaan worden gemaakt. We verwijderen je profiel, garage, check-ins, reacties, Top!’s, chats, ingestuurde foto’s en meldingen. Wil je je gegevens eerst bewaren? Kies dan eerst Mijn gegevens downloaden.</p></div>
+    <form id="uform" class="stack" novalidate>
+      <div><label class="l" for="u-confirm">Typ je gebruikersnaam (${esc(me())}) om te bevestigen</label><input id="u-confirm" class="field" autocomplete="off"></div>
+      <p class="err" id="u-err" role="alert"></p>
+      <button class="cta danger" type="submit">Account definitief verwijderen</button>
+    </form>`;
+  if(!udlg.open)udlg.showModal();
+}
+async function deleteAccount(confirmName){
+  await fn('delete-account',{confirm:confirmName});
+  sessSave(null);store.session='';store.chats={};OWNER=false;LV.myRow=null;LV.email='';inbox=null;modq=null;
+  view={...view,name:'feed',user:null,chat:null};
+  await reloadAll();window.scrollTo(0,0);
+  toast('Je account en je gegevens zijn verwijderd.');
 }
 
 

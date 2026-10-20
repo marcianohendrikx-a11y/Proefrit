@@ -331,6 +331,29 @@ L = L[:s] + r"""    const btn=f.querySelector('button');btn.disabled=true;inp.di
 """ + L[e2:]
 L = rep(L, "[dlg,fdlg,pdlg,adlg,cdlg,phdlg,mdlg].forEach(", "[dlg,fdlg,pdlg,adlg,cdlg,phdlg,mdlg].forEach(")
 
+# ---------- Privacy: eigen gegevens downloaden, account verwijderen, privacyverklaring ----------
+L = rep(L, "Nog geen check-ins.'}</div>`}</div></div>`;",
+        "Nog geen check-ins.'}</div>`}</div></div>${self?`<div class=\"section\"><h3 style=\"margin:0\">Je account</h3><p class=\"explain\" style=\"margin:0\">Ingelogd als ${esc(LV.email||'')}. Je e-mailadres ziet niemand anders.</p><div class=\"row\"><button class=\"ghost sm\" data-act=\"export\">Mijn gegevens downloaden</button><button class=\"ghost sm\" data-act=\"delacct\">Account verwijderen</button></div><p class=\"explain\" style=\"margin:0\">Lees in de <a href=\"privacy.html\">privacyverklaring</a> wat we bewaren en waarom.</p></div>`:''}`;")
+L = rep(L, 'Woordfilter deels op basis van <a href="https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words" target="_blank" rel="noopener">LDNOOBW</a> (CC BY 4.0).</span></div>`;',
+        'Woordfilter deels op basis van <a href="https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words" target="_blank" rel="noopener">LDNOOBW</a> (CC BY 4.0). <a href="privacy.html">Privacyverklaring</a>.</span></div>`;')
+L = rep(L, "  else if(a==='reload')reloadAll();", "  else if(a==='reload')reloadAll();\n  else if(a==='export')exportMyData(t);\n  else if(a==='delacct')openDeleteDialog();")
+
+# ---------- Eigen check-ins en reacties verwijderen (beheerders mogen alles verwijderen) ----------
+L = rep(L, '      ${own&&vfOf(r)<2?`<button class="pill add" data-act="addproof" data-id="${esc(r.id)}">Bewijs toevoegen</button>`:\'\'}',
+        '      ${own&&vfOf(r)<2?`<button class="pill add" data-act="addproof" data-id="${esc(r.id)}">Bewijs toevoegen</button>`:\'\'}${own||OWNER?`<button class="plain delbtn" data-act="delrev" data-id="${esc(r.id)}">Verwijderen</button>`:\'\'}')
+L = rep(L, '<div><div class="meta"><button class="ulink" data-act="user" data-user="${esc(c.user)}">${esc(c.user)}</button> · ${ago(c.ts)}</div>',
+        '<div><div class="meta"><button class="ulink" data-act="user" data-user="${esc(c.user)}">${esc(c.user)}</button> · ${ago(c.ts)}${me()&&(c.user===me()||OWNER)?` · <button class="plain delbtn" data-act="delcm" data-id="${esc(c.id)}" data-rid="${esc(r.id)}">Verwijderen</button>`:\'\'}</div>')
+L = rep(L, "  else if(a==='export')exportMyData(t);", """  else if(a==='export')exportMyData(t);
+  else if(a==='delrev'||a==='delcm'){
+    if(t.dataset.sure!=='1'){t.dataset.sure='1';t.textContent='Echt verwijderen?';return}
+    t.disabled=true;const id=t.dataset.id;
+    rest('DELETE',(a==='delrev'?'reviews':'comments')+'?id=eq.'+encodeURIComponent(id)+'&select=id',undefined,'return=representation').then(rows=>{
+      if(!rows||!rows.length)throw new Error('Dat mag niet met je account.');
+      if(a==='delrev'){const i=SEED.findIndex(x=>x.id===id);if(i>=0)SEED.splice(i,1);render();toast('Check-in verwijderd.')}
+      else{const r=reviewById(t.dataset.rid);if(r)r.comments=r.comments.filter(c=>c.id!==id);refreshCard(t.dataset.rid);toast('Reactie verwijderd.')}
+    }).catch(x=>{t.disabled=false;toast(x.message)});
+  }""")
+
 # ---------- Start ----------
 s = L.index("/* ===== Start ===== */")
 L = L[:s] + core + "\n" + r"""
@@ -385,7 +408,9 @@ H = rep(H, """<label class="l" for="a-login">Gebruikersnaam of e-mailadres</labe
 H = rep(H, """      <p class="err" id="a-err" role="alert"></p>\n      <button class="cta" id="authsubmit" type="submit">Inloggen</button>\n    </form>""",
         """      <p class="err" id="a-err" role="alert"></p>\n      <p class="notice" id="a-ok" hidden></p>\n      <button class="cta" id="authsubmit" type="submit">Inloggen</button>\n    </form>""")
 H = rep(H, """    <button class="plain" type="button" data-act="demo" style="align-self:flex-start">Of probeer het demo-account met voorbeeldritten</button>\n    <p class="explain">Dit is een prototype. Accounts, berichten en reacties blijven in deze browser en worden nergens heen gestuurd.</p>""",
-        """    <button class="plain g-in" type="button" data-act="forgot" style="align-self:flex-start">Wachtwoord vergeten?</button>\n    <p class="explain">Je e-mailadres laten we nooit aan andere leden zien. Wat je deelt op je profiel, kies je zelf.</p>""")
+        """    <button class="plain g-in" type="button" data-act="forgot" style="align-self:flex-start">Wachtwoord vergeten?</button>\n    <p class="explain">Je e-mailadres laten we nooit aan andere leden zien. Wat je deelt op je profiel, kies je zelf. Lees ook de <a href="privacy.html" target="_blank" rel="noopener">privacyverklaring</a>.</p>""")
+H = rep(H, '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap">', '<link rel="stylesheet" href="fonts/fonts.css">')
+H = rep(H, '</style>', '.cta.danger{background:#c62828;color:#fff;border-color:#7f1515}\n.plain.delbtn{color:var(--muted);font-size:13px}\n</style>')
 H = rep(H, '<dialog id="cdlg"', '<dialog id="udlg" aria-labelledby="utitle"><div class="authbox" id="ubox"></div></dialog>\n<dialog id="cdlg"')
 FAV = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='2' y='14' width='60' height='36' rx='6' fill='%23f9c800' stroke='%2315181d' stroke-width='3'/%3E%3Crect x='5' y='17' width='11' height='30' rx='2' fill='%230b3f93'/%3E%3Ctext x='39' y='42' font-family='Arial' font-weight='700' font-size='26' text-anchor='middle' fill='%2315181d'%3EP%3C/text%3E%3C/svg%3E"
 H = ('<!doctype html>\n<html lang="nl">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'

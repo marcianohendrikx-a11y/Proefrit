@@ -324,6 +324,11 @@ udlg.addEventListener('submit',async e=>{
   e.preventDefault();const err=$('u-err'),btn=e.target.querySelector('button.cta');err.textContent='';
   try{
     btn.disabled=true;
+    if(udlgMode==='del'){
+      const v=$('u-confirm').value.trim();
+      if(v.toLowerCase()!==me().toLowerCase()){err.textContent='Typ je gebruikersnaam precies over om te bevestigen.';return}
+      await deleteAccount(v);udlgDone=true;udlg.close();return;
+    }
     if(udlgMode==='pw'){
       const pw=$('u-pw').value;if(pw.length<8){err.textContent='Kies een wachtwoord van minstens 8 tekens.';return}
       const r=await sbFetch(SB.url+'/auth/v1/user',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
@@ -383,4 +388,41 @@ async function boot(){
     if(!profileOf(me()).onboarded)openOnboarding('new',1,null);
     else{const n=reqCount();if(n)toast(`Je hebt ${n} chatverzoek${n>1?'en':''}. Open Chat om te reageren.`)}
   }
+}
+
+/* ---------- Je eigen gegevens (AVG): downloaden en account verwijderen ---------- */
+async function exportMyData(btn){
+  const uid=sbUid();if(!uid)return;
+  if(btn)btn.disabled=true;
+  try{
+    const q=(t,f)=>rest('GET',`${t}?select=*&${f||'user_id'}=eq.${uid}`).catch(()=>[]);
+    const [profiel,garage,checkins,reacties,tops,tickets,fotos,gesprekken]=await Promise.all([
+      q('profiles','id'),q('garage_items'),q('reviews'),q('comments'),q('likes'),q('tickets'),q('photo_submissions'),rest('GET','conversations?select=*').catch(()=>[])]);
+    const berichten=gesprekken.length?await restIn('messages','*','conversation_id',gesprekken.map(c=>c.id)).catch(()=>[]):[];
+    const data={uitgifte:new Date().toISOString(),uitleg:'Alle gegevens die Proefrit over je account bewaart. Van gesprekken staan ook de berichten van de ander erbij, omdat die bij het gesprek horen.',
+      account:{email:LV.email},profiel,garage,checkins,reacties,top:tops,gesprekken,berichten,tickets,fotos};
+    const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+    const a=document.createElement('a');a.href=url;a.download=`proefrit-gegevens-${me()}.json`;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),5000);
+    toast('Je gegevens zijn gedownload als bestand.');
+  }catch(e){toast('Downloaden lukte niet: '+e.message)}
+  finally{if(btn)btn.disabled=false}
+}
+function openDeleteDialog(){
+  udlgMode='del';udlgDone=false;
+  $('ubox').innerHTML=`<div class="fh"><span class="lp"><i aria-hidden="true">NL</i><b>PROEFRIT</b></span><button type="button" class="x" data-act="ucancel" aria-label="Sluiten">×</button></div>
+    <div><h2 id="utitle">Account verwijderen</h2><p class="sub" style="margin:0">Dit kan niet ongedaan worden gemaakt. We verwijderen je profiel, garage, check-ins, reacties, Top!’s, chats, ingestuurde foto’s en meldingen. Wil je je gegevens eerst bewaren? Kies dan eerst Mijn gegevens downloaden.</p></div>
+    <form id="uform" class="stack" novalidate>
+      <div><label class="l" for="u-confirm">Typ je gebruikersnaam (${esc(me())}) om te bevestigen</label><input id="u-confirm" class="field" autocomplete="off"></div>
+      <p class="err" id="u-err" role="alert"></p>
+      <button class="cta danger" type="submit">Account definitief verwijderen</button>
+    </form>`;
+  if(!udlg.open)udlg.showModal();
+}
+async function deleteAccount(confirmName){
+  await fn('delete-account',{confirm:confirmName});
+  sessSave(null);store.session='';store.chats={};OWNER=false;LV.myRow=null;LV.email='';inbox=null;modq=null;
+  view={...view,name:'feed',user:null,chat:null};
+  await reloadAll();window.scrollTo(0,0);
+  toast('Je account en je gegevens zijn verwijderd.');
 }
