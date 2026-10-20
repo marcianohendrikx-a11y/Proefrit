@@ -448,3 +448,7 @@ H = ('<!doctype html>\n<html lang="nl">\n<head>\n<meta charset="utf-8">\n<meta n
 js = ''.join(open(P + n).read() for n in ['catalog_head.js', 'catalog_add.js', 'catalog_classic.js', 'catalog_us.js', 'visual8.js', 'vocab8.js']) + L
 open(OUT, 'w').write(H + '<script>\n' + js + '</script>\n')
 print('ok', OUT, len(H) + len(js))
+import subprocess, shutil
+if shutil.which('node') and OUT.endswith(os.path.join('web','index.html')):
+    r = subprocess.run(['node', os.path.join(ROOT, 'app', 'check.mjs')])
+    assert r.returncode == 0, 'syntaxfout in de app'

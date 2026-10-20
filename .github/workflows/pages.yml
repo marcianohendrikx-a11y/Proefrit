@@ -20,6 +20,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - name: Controleren op fouten in de app
+        run: node app/check.mjs
       - name: Lettertypen zelf hosten (geen verbinding met Google Fonts nodig)
         run: |
           set -e
