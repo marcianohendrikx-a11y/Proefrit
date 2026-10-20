@@ -458,9 +458,9 @@ function findCars(q,limit){
 }
 function addCarFinder(p,onChange){
   const brand=$(p+'-brand');if(!brand||$(p+'-find'))return;
-  const row=brand.closest('.two')||brand.parentElement;
+  const row=brand.closest('details.manual')||brand.closest('.two')||brand.parentElement;
   const box=document.createElement('div');box.className='finder';
-  box.innerHTML=`<label class="l" for="${p}-find">Zoek je auto</label><input id="${p}-find" class="field" type="search" autocomplete="off" placeholder="Typ merk en model, bijvoorbeeld Golf of Ram 1500" aria-controls="${p}-findres" aria-autocomplete="list"><div class="hres finres" id="${p}-findres" role="listbox" hidden></div><p class="hint">Of kies hieronder merk en model uit de lijst.</p>`;
+  box.innerHTML=`<label class="l" for="${p}-find">Zoek je auto</label><input id="${p}-find" class="field" type="search" autocomplete="off" placeholder="Typ merk en model, bijvoorbeeld Golf of Ram 1500" aria-controls="${p}-findres" aria-autocomplete="list"><div class="hres finres" id="${p}-findres" role="listbox" hidden></div>`;
   row.parentElement.insertBefore(box,row);
   const inp=$(p+'-find'),res=$(p+'-findres');let list=[],act=-1;
   const show=()=>{
@@ -608,4 +608,19 @@ function discoverHtml(){
   if(!recent.length)h+=`<div class="empty">Er zijn nog geen auto’s beoordeeld. Zoek de auto die jij onlangs reed en wees de eerste.</div>`;
   h+=`<div class="allcars"><p>Zoek hierboven op merk of model, kies een merk, of bekijk alle ${CARS.length.toLocaleString('nl-NL')} modellen.</p><button class="ghost sm" data-act="showall">Alle modellen tonen</button></div>`;
   return h;
+}
+
+/* ---------- Badges op je eigen profiel: eerst wat je hebt en wat bijna lukt ---------- */
+let showAllBadges=false;
+function badgesSelfHtml(bs){
+  if(showAllBadges)return `<div class="badges">${bs.map(x=>badgeCard(x,true)).join('')}</div><button type="button" class="plain" data-act="badgesall">Minder badges tonen</button>`;
+  const earned=bs.filter(x=>x.lvl>0),open=bs.filter(x=>!x.lvl&&!x.b.hidden).sort((a,b)=>(b.val/(b.next||1))-(a.val/(a.next||1))).slice(0,3);
+  const hiddenLeft=bs.filter(x=>x.b.hidden&&!x.lvl).length;
+  return `<div class="badges">${earned.concat(open).map(x=>badgeCard(x,true)).join('')}</div>
+    <p class="explain" style="margin:0">${hiddenLeft?`Nog ${hiddenLeft} verborgen ${hiddenLeft===1?'badge':'badges'} te ontdekken. `:''}<button type="button" class="plain" data-act="badgesall">Alle ${bs.length} badges bekijken</button></p>`;
+}
+/* ---------- Check-in: per onderdeel beoordelen is optioneel ---------- */
+function catsMode(on){
+  const sl=$('sliders');if(!sl)return;sl.hidden=!on;
+  if(on&&stars)CATS.forEach(([k])=>{const r=form.querySelector(`input[name="rt-${k}"][value="${stars}"]`);if(r&&!sl.dataset.touched){r.checked=true;tireSync(k)}});
 }

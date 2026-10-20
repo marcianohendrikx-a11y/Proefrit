@@ -487,6 +487,35 @@ textarea.field{min-height:96px;resize:vertical}
 /* verborgen badges */
 .tier.th{background:#7b51d6;color:#fff}
 .badge.secret strong{color:var(--muted)}
+/* ---- Vormgeving: rustiger koppen, nette knoppen ---- */
+[hidden]{display:none!important}
+h3{text-transform:none;letter-spacing:.01em;font-size:22px}
+.hist h4,.card h4,.ggroup h4,.gedit h4{text-transform:none;letter-spacing:0;font:600 15px/1.2 var(--body);color:var(--fg)}
+.ggroup h4{color:var(--muted)}
+.badge strong{text-transform:none;letter-spacing:.01em;font-size:19px}
+.stamp{text-transform:none;letter-spacing:0;font:600 12px/1 var(--body);padding:4px 7px}
+.ghost,.ghost.sm,.seg button{font:600 15px/1.1 var(--body);text-transform:none;letter-spacing:0}
+.ghost{padding:10px 16px}.ghost.sm{padding:8px 13px;font-size:14px}
+.feedseg{display:inline-grid;grid-template-columns:auto auto;border-radius:999px;margin:0 0 14px}
+.feedseg button{padding:7px 16px;font-size:14px}
+.emb>b{font-family:var(--display);font-size:inherit;line-height:1;letter-spacing:.02em;text-transform:none;overflow-wrap:normal;white-space:nowrap;color:inherit}
+.emb.sm>b{margin-top:0}.emb.sm.e3>b{font-size:9px}.emb.e3>b{font-size:14px}.emb.lg.e3>b{font-size:22px}
+.cats{gap:6px 16px}
+.cat span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.tires{gap:1px}.tires svg{width:14px;height:14px}
+.srow{grid-template-columns:minmax(0,1fr) auto}.srow output{display:none}
+#sliders{display:flex;flex-direction:column;gap:10px;margin-top:-4px}#sliders[hidden]{display:none}
+.catsw{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+details.manual>summary{cursor:pointer;color:var(--accent);font-weight:600;font-size:14px;list-style:none;width:max-content}
+details.manual>summary::-webkit-details-marker{display:none}
+details.manual[open]>summary{margin-bottom:10px}
+input[type=file]{font:inherit;font-size:14px;color:var(--muted);max-width:100%}
+input[type=file]::file-selector-button{font:600 14px/1 var(--body);background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:9px 14px;margin-right:10px;cursor:pointer}
+input[type=file]::file-selector-button:hover{border-color:var(--accent);color:var(--accent)}
+.sitefoot{font-size:14px;gap:8px 20px}
+.sitefoot>span:first-child{flex-basis:100%;margin-bottom:-4px}
+.notice{border-style:solid;background:var(--surface)}
+.empty{border-style:solid;background:color-mix(in srgb,var(--surface) 60%,transparent)}
 .cta.danger{background:#c62828;color:#fff;border-color:#7f1515}
 .plain.delbtn{color:var(--muted);font-size:13px}
 .finder{position:relative}
@@ -607,12 +636,12 @@ button,.carrow,.convo,.btile,.pill,.fbtn,.ghost,.cta,.more,.gbtn,.seg button,.bn
     <div class="fh"><h2 id="dlgtitle">Nieuwe check-in</h2><button type="button" class="x" data-act="close" aria-label="Sluiten">×</button></div>
     <div class="platebox"><label class="l" for="ci-plate">Kenteken</label>
       <div class="pin"><i aria-hidden="true">NL</i><input id="ci-plate" maxlength="8" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XX-999-X"></div>
-      <p class="hint">Vul je kenteken in, dan zoeken we merk, model en brandstof voor je op. Het is ook nodig voor verificatie. We tonen het nooit en bewaren alleen een versleutelde code.</p>
+      <p class="hint">We zoeken de auto voor je op. Je kenteken tonen we nooit.</p>
       <p class="hint" id="ci-rdw" aria-live="polite"></p></div>
-    <div class="two">
+    <details class="manual"><summary>Merk en model zelf kiezen</summary><div class="two">
       <div><label class="l" for="ci-brand">Merk</label><select id="ci-brand" class="field"></select></div>
       <div><label class="l" for="ci-model">Model of serie</label><select id="ci-model" class="field" disabled></select></div>
-    </div>
+    </div></details>
     <div class="two">
       <div><label class="l" for="ci-fuel">Brandstof</label><select id="ci-fuel" class="field" disabled></select></div>
       <div><label class="l" for="ci-ver">Versie (optioneel)</label><select id="ci-ver" class="field" disabled></select></div>
@@ -625,10 +654,11 @@ button,.carrow,.convo,.btile,.pill,.fbtn,.ghost,.cta,.more,.gbtn,.seg button,.bn
     </div>
     <div><span class="l" id="starlbl">Totaalscore</span>
       <div class="stars" id="stars" role="group" aria-labelledby="starlbl"></div></div>
-    <div id="sliders" style="display:flex;flex-direction:column;gap:10px"></div>
+    <label class="sw catsw"><input type="checkbox" id="ci-cats" onchange="catsMode(this.checked)"><span class="track" aria-hidden="true"></span><span class="swt"><b>Per onderdeel beoordelen</b></span></label>
+    <div id="sliders" hidden></div>
     <div><label class="l" for="ci-text">Jouw ervaring</label>
       <textarea id="ci-text" class="field" maxlength="500" placeholder="Wat viel je op tijdens de rit?"></textarea></div>
-    <div><span class="l" id="taglbl">Wat viel op? <span class="meta">Kies er maximaal 5. Typ en kies een woord uit de lijst.</span></span><div id="ci-tags" role="group" aria-labelledby="taglbl"></div></div>
+    <div><span class="l" id="taglbl">Wat viel op? <span class="meta">Maximaal 5</span></span><div id="ci-tags" role="group" aria-labelledby="taglbl"></div></div>
     <div class="card proof" id="ci-proof"></div>
     <p class="err" id="ci-err" role="alert"></p>
     <button class="cta" id="ci-submit" type="submit">Plaats check-in</button>
@@ -2893,14 +2923,14 @@ async function showProof(p){return showProofLive(p);
 function demoPlateList(p){
   return Object.entries(DEMO_RDW).map(([k,rec])=>{const n=normPlate(k);return `<li><button type="button" data-act="useplate" data-p="${p}" data-plate="${n?n.fmt:k}"><b>${n?n.fmt:k}</b>${esc(rec.merk.charAt(0)+rec.merk.slice(1).toLowerCase())} ${esc(rec.handelsbenaming)} · ${esc(rdwFuel(rec))} · ${rec.jaar}</button></li>`}).join('');
 }
-function proofBlock(p,intro,withPlate){
+function proofBlock(p,intro,withPlate){intro=p==='ci'?'Met kenteken én foto is je check-in geverifieerd. Alleen geverifieerde check-ins tellen voor badges.':intro;
   return `<div><h3 style="margin:0 0 4px">Controle van je rit</h3><p class="explain">${intro}</p></div>
   ${withPlate===false?'':`<div><label class="l" for="${p}-plate">Kenteken</label>
     <div class="pin"><i aria-hidden="true">NL</i><input id="${p}-plate" maxlength="8" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XX-999-X"></div>
     <p class="hint">We vergelijken het kenteken met de RDW: merk, model, brandstof en bouwjaar moeten overeenkomen met je auto. We tonen het kenteken nooit en bewaren alleen een versleutelde code.</p></div>`}
   <div><label class="l" for="${p}-photo">Foto met het kenteken in beeld</label>
     <input id="${p}-photo" type="file" accept="image/*">
-    <p class="hint">Bij het plaatsen leest Claude het kenteken op de foto en vergelijkt het met wat je invulde. We controleren ook of de foto al is gebruikt en van rond de ritdatum is. De foto zelf wordt niet opgeslagen, tenzij je kiest om hem bij de auto te delen.</p></div>
+    <p class="hint">Claude leest het kenteken op de foto. De foto bewaren we niet, tenzij je hem deelt bij de auto.</p></div>
   ${p==='ci'?'<label class="chk" id="ci-sharewrap" hidden><input type="checkbox" id="ci-share"><span>Deel deze foto ook bij de auto. Ik heb hem zelf gemaakt. Het kenteken maken we onherkenbaar en het team keurt hem eerst.</span></label>':''}
   <details class="demoplates" hidden><summary>Demo-kentekens om te proberen</summary><p class="hint">In dit prototype kent de RDW-demo alleen deze kentekens. Kies de bijbehorende auto om een goede match te zien, of een andere auto om een afwijzing te zien.</p><ul>${demoPlateList(p)}</ul></details>
   <p class="vstate" id="${p}-state" aria-live="polite"></p>`;
@@ -2953,13 +2983,13 @@ function refreshCard(id,focus){
 }
 function siteFoot(){
   const n=OWNER&&inbox?inbox.filter(t=>t.status!=='Afgehandeld').length:0;
-  return `<div class="sitefoot"><span>Iets gezien dat niet klopt?</span><button class="plain" data-act="feedback">Opmerking over de website plaatsen</button>${OWNER?`<button class="plain" data-act="feedback">Ticket-inbox${inbox?' ('+n+' open)':''}</button><button class="plain" data-act="modq">Fotokeuring${modq?' ('+modq.length+')':''}</button>`:''}${me()?'<button class="plain" data-act="logout">Uitloggen</button>':'<button class="plain" data-act="auth" data-mode="in">Inloggen</button>'}<span class="credit">Catalogus deels op basis van <a href="https://github.com/abhionlyone/us-car-models-data" target="_blank" rel="noopener">US Car Models Data</a> (CC BY 4.0). Merkplaatjes en illustraties zijn eigen ontwerp; merknamen zijn van hun eigenaren. Foto’s van rijders zijn van de makers en worden pas na keuring getoond. Woordfilter deels op basis van <a href="https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words" target="_blank" rel="noopener">LDNOOBW</a> (CC BY 4.0). <a href="privacy.html">Privacyverklaring</a>.</span></div>`;
+  return `<div class="sitefoot"><span>Iets gezien dat niet klopt?</span><button class="plain" data-act="feedback">Opmerking over de website plaatsen</button>${OWNER?`<button class="plain" data-act="feedback">Ticket-inbox${inbox?' ('+n+' open)':''}</button><button class="plain" data-act="modq">Fotokeuring${modq?' ('+modq.length+')':''}</button>`:''}${me()?'<button class="plain" data-act="logout">Uitloggen</button>':'<button class="plain" data-act="auth" data-mode="in">Inloggen</button>'}<a class="plain" href="privacy.html">Privacy en bronnen</a></div>`;
 }
 const gate=(title,text)=>`<div class="card gate"><h2>${title}</h2><p>${text}</p><div class="row"><button class="cta" data-act="auth" data-mode="up" data-reason="${esc(text)}">Account maken</button><button class="ghost" data-act="auth" data-mode="in" data-reason="${esc(text)}">Inloggen</button></div></div>`;
 
 function renderFeed(){
   return `<h2>Laatste check-ins</h2><p class="sub">Wat mensen vonden van auto’s die ze zelf gereden hebben.</p>
-  ${me()?'':`<div class="card" style="margin-bottom:16px"><h3 style="margin:0">Rondkijken mag zonder account</h3><p style="margin:0;color:var(--muted)">Je kunt alle reviews, auto’s en openbare profielen bekijken. Een account heb je nodig om een check-in te plaatsen, te reageren of te chatten.</p><div class="row"><button class="cta sm" data-act="auth" data-mode="up">Account maken</button><button class="ghost sm" data-act="auth" data-mode="in">Inloggen</button></div></div>`}
+  ${me()?'':`<div class="card" style="margin-bottom:16px"><h3 style="margin:0">Rondkijken mag zonder account</h3><p style="margin:0;color:var(--muted)">Bekijk alles zonder account. Met een account plaats je check-ins, reageer je en chat je met andere rijders.</p><div class="row"><button class="cta sm" data-act="auth" data-mode="up">Account maken</button><button class="ghost sm" data-act="auth" data-mode="in">Inloggen</button></div></div>`}
   <div class="seg feedseg" role="group" aria-label="Welke check-ins"><button data-act="feedver" data-v="0" aria-pressed="${!view.feedVer}">Alles</button><button data-act="feedver" data-v="1" aria-pressed="${!!view.feedVer}">Alleen geverifieerd</button></div>
   <div class="list">${!LV.loaded?'<div class="empty">Check-ins laden…</div>':LV.loadErr?`<div class="empty">Laden lukte niet: ${esc(LV.loadErr)} <button class="plain" data-act="reload">Opnieuw proberen</button></div>`:(all().filter(r=>!view.feedVer||isVer(r)).map(reviewCard).join('')||`<div class="empty">${view.feedVer?'Nog geen geverifieerde check-ins.':'Nog geen check-ins. Reed je onlangs een auto? Plaats de eerste met de gele knop.'}</div>`)}</div>`;
 }
@@ -3015,7 +3045,7 @@ function renderCar(){
     ${fit?`<div class="fit"><span class="fitpill">Past bij jou: ${fit.pct}%</span><small>Op basis van je interesses (${fit.used.map(esc).join(', ')}) en de scores per onderdeel.</small></div>`:''}
     ${owners.length||fans.length?`<div class="garline">${owners.length?`<span>In de garage van ${nameLinks(owners)}</span>`:''}${fans.length?`<span>Droomauto van ${nameLinks(fans)}</span>`:''}</div>`:''}
   </div>
-  <div class="filterrow" style="margin-top:16px">
+  <div class="filterrow" style="margin-top:16px"${allL.length<2?' hidden':''}>
     ${vopts.length?`<div style="flex:1 1 240px;min-width:0"><label class="l" for="verfilter" style="margin-bottom:4px">Bekijk per versie</label>
       <select id="verfilter" class="field"><option value="">Alle versies (${allL.length})</option>${vopts.map(v=>`<option value="${esc(v)}"${view.ver===v?' selected':''}>${esc(v)} (${counts[v]})</option>`).join('')}</select></div>`:''}
     <button class="fbtn" data-act="onlyver" aria-pressed="${view.onlyVer}">Alleen geverifieerd</button>
@@ -3023,7 +3053,7 @@ function renderCar(){
   <div class="section"><h3>Gemiddeld per onderdeel</h3>
   ${s.n?`<div class="bars card">${CATS.map(([k,lb])=>`<div class="bar"><span>${lb}</span><div class="tr"><div class="fl" style="width:${s.cats[k]/5*100}%"></div></div><b>${fmt(s.cats[k])}</b></div>`).join('')}
     <p class="explain">Gewogen gemiddelde: een geverifieerde check-in telt twee keer mee, een deels geverifieerde anderhalf keer.</p></div>
-    <div class="card hist"><h4>Verdeling van de sterren</h4>${dist.map(x=>`<div class="hrow"><span>${x.n} ★</span><div class="tr"><div class="fl" style="width:${x.c/dmax*100}%"></div></div><b>${x.c}</b></div>`).join('')}</div>
+    <div class="card hist"${s.n<3?' hidden':''}><h4>Verdeling van de sterren</h4>${dist.map(x=>`<div class="hrow"><span>${x.n} ★</span><div class="tr"><div class="fl" style="width:${x.c/dmax*100}%"></div></div><b>${x.c}</b></div>`).join('')}</div>
     ${topTags.length?`<div class="card"><h4 style="margin:0">Meest genoemd</h4><div class="tags">${topTags.map(([t,n])=>`<span class="chip tg ${NEG_TAGS.has(t)?'neg':'pos'}">${NEG_TAGS.has(t)?'−':'+'} ${esc(t)} <b>${n}</b></span>`).join('')}</div></div>`:''}`:`<div class="empty">${view.onlyVer?'Er is nog geen geverifieerde check-in voor deze auto.':'Nog niemand heeft deze auto beoordeeld. Wees de eerste.'}</div>`}</div>
   <div class="section" id="carphotos">${carPhotosHtml(c)}</div>
   <div class="section"><h3>Reviews</h3><div class="list">${l.map(reviewCard).join('')||'<div class="empty">Nog geen reviews.</div>'}</div></div>`;
@@ -3096,7 +3126,7 @@ function renderProfile(name){
   <div class="section" style="margin-top:0"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Garage</h3>${self?'<button class="plain" data-act="editgarage">Garage beheren</button>':''}</div>${self?garageOrderHtml(p):''}<div class="garage">${garageHtmlLive(p,self,name)}</div></div>
   <div class="section"><h3 style="margin:0">Badges (${earned.length} van ${BADGES.length})</h3>
   <p class="explain" style="margin:-6px 0 0">Badges tellen alleen geverifieerde check-ins, met kenteken én foto. ${BADGES.filter(b=>b.hidden).length} badges zijn verborgen: die ontdek je door te rijden.</p>
-  ${self?`<div class="badges">${bs.map(x=>badgeCard(x,true)).join('')}</div>`
+  ${self?badgesSelfHtml(bs)
         :(earned.length?`<div class="badges compact">${earned.map(x=>badgeCard(x,false)).join('')}</div>`:'<div class="empty">Nog geen badges behaald.</div>')}</div>
   <div class="section"><h3>${self?'Jouw check-ins':'Check-ins van '+esc(name)}</h3><div class="list">${l.map(reviewCard).join('')||`<div class="empty">${self?'Je hebt nog niets gecheckt. Tik op + Check-in om te beginnen.':'Nog geen check-ins.'}</div>`}</div></div>${self?`<div class="section"><h3 style="margin:0">Je account</h3><p class="explain" style="margin:0">Ingelogd als ${esc(LV.email||'')}. Je e-mailadres ziet niemand anders.</p><div class="row"><button class="ghost sm" data-act="export">Mijn gegevens downloaden</button><button class="ghost sm" data-act="delacct">Account verwijderen</button></div><p class="explain" style="margin:0">Lees in de <a href="privacy.html">privacyverklaring</a> wat we bewaren en waarom.</p></div>`:''}`;
 }
@@ -3386,7 +3416,7 @@ function obStep3(d){
   <div id="ob-glist" class="stack" style="gap:8px">${garageEditList(d)}</div>
   <div class="card gadd"><h3 style="margin:0">Auto toevoegen</h3>
     ${segRow('ga-status','Status',Object.entries(GSTATUS),'nu')}
-    <div class="two"><div><label class="l" for="ga-brand">Merk</label><select id="ga-brand" class="field"></select></div><div><label class="l" for="ga-model">Model of serie</label><select id="ga-model" class="field" disabled></select></div></div>
+    <details class="manual"><summary>Merk en model zelf kiezen</summary><div class="two"><div><label class="l" for="ga-brand">Merk</label><select id="ga-brand" class="field"></select></div><div><label class="l" for="ga-model">Model of serie</label><select id="ga-model" class="field" disabled></select></div></div></details>
     <div class="two"><div><label class="l" for="ga-fuel">Brandstof</label><select id="ga-fuel" class="field" disabled></select></div><div><label class="l" for="ga-ver">Versie (optioneel)</label><select id="ga-ver" class="field" disabled></select></div></div>
     <label class="chk" id="ga-lpgwrap" hidden><input type="checkbox" id="ga-lpg"><span>Met LPG-installatie (achteraf ingebouwd)</span></label>
     <div class="cprev" id="ga-prev" hidden></div>
@@ -3494,7 +3524,7 @@ function resizeImage(file,size){
 async function garageAdd(){
   const err=$('ga-err');err.textContent='';
   const car=$('ga-model').value,fuel=effFuel('ga'),status=(document.querySelector('input[name="ga-status"]:checked')||{}).value||'nu';
-  if(!car){err.textContent='Kies eerst het merk en het model.';return}
+  if(!car){err.textContent='Zoek eerst de auto, of vul het kenteken in.';return}
   if(!fuel){err.textContent='Kies de brandstof.';return}
   const d=ob.draft;
   if(d.garage.length>=12){err.textContent='Je garage zit vol (12 auto’s). Verwijder er eerst een.';return}
@@ -3731,7 +3761,7 @@ const HIDDEN_COL='#7b51d6';
 /* ===== Check-in formulier ===== */
 const dlg=$('dlg'),form=$('form'),pdlg=$('pdlg'),pform=$('pform');
 let stars=0;
-function setStars(n){stars=n;document.querySelectorAll('#stars button').forEach((b,i)=>{b.classList.toggle('on',i<n);b.setAttribute('aria-pressed',String(i+1===n))})}
+function setStars(n){stars=n;if($('ci-cats')&&!$('ci-cats').checked)CATS.forEach(([k])=>{const r=form.querySelector(`input[name="rt-${k}"][value="${n}"]`);if(r){r.checked=true;tireSync(k)}});document.querySelectorAll('#stars button').forEach((b,i)=>{b.classList.toggle('on',i<n);b.setAttribute('aria-pressed',String(i+1===n))})}
 (function buildForm(){
   bindPicker('ci',()=>scheduleProof('ci'));
   $('stars').innerHTML=[1,2,3,4,5].map(i=>`<button type="button" data-star="${i}" aria-label="${i} ${i===1?'ster':'sterren'}" aria-pressed="false">★</button>`).join('');
@@ -3746,7 +3776,7 @@ function setStars(n){stars=n;document.querySelectorAll('#stars button').forEach(
   });
 })();
 $('stars').addEventListener('click',e=>{const b=e.target.closest('[data-star]');if(b)setStars(+b.dataset.star)});
-$('sliders').addEventListener('change',e=>{const m=/^rt-(\w+)$/.exec(e.target.name||'');if(m)tireSync(m[1])});
+$('sliders').addEventListener('change',e=>{$('sliders').dataset.touched='1';const m=/^rt-(\w+)$/.exec(e.target.name||'');if(m)tireSync(m[1])});
 $('ci-date').addEventListener('change',()=>scheduleProof('ci'));
 form.addEventListener('input',()=>{$('ci-err').textContent=''});
 form.addEventListener('change',e=>{$('ci-err').textContent='';if(e.target.name==='tag'&&form.querySelectorAll('input[name="tag"]:checked').length>5){e.target.checked=false;$('ci-err').textContent='Kies maximaal 5 kenmerken.'}});
@@ -3754,7 +3784,7 @@ pform.addEventListener('input',()=>{$('pf-err').textContent=''});
 
 function openForm(carId,opts){
   opts=opts||{};
-  form.reset();setStars(0);CATS.forEach(([k])=>tireSync(k));pickers['ci-pick'].sel=[];pickerMount('ci-pick');
+  form.reset();delete $('sliders').dataset.touched;catsMode(false);setStars(0);CATS.forEach(([k])=>tireSync(k));pickers['ci-pick'].sel=[];pickerMount('ci-pick');
   setPicker('ci',carId||'',opts.fuel,opts.ver);
   if(opts.ride){const r=form.querySelector(`input[name="ride"][value="${opts.ride}"]`);if(r)r.checked=true}
   $('ci-date').value=today();$('ci-date').max=today();$('ci-err').textContent='';$('ci-rdw').innerHTML='';autoFilled.ci=null;
@@ -3773,13 +3803,13 @@ form.addEventListener('submit',async e=>{
   const err=$('ci-err'),btn=$('ci-submit');err.textContent='';
   if(!me()){err.textContent='Log in om een check-in te plaatsen.';return}
   const car=$('ci-model').value,fuel=effFuel('ci'),date=$('ci-date').value;
-  if(!car){err.textContent='Kies eerst het merk en het model of de serie die je hebt gereden.';return}
+  if(!car){err.textContent='Zoek eerst je auto, of vul het kenteken in.';return}
   if(!fuel){err.textContent='Kies de brandstof van de auto.';return}
   if(!date||date>today()){err.textContent='Vul de datum van de rit in. Die kan niet in de toekomst liggen.';return}
   if(!stars){err.textContent='Geef een totaalscore met de sterren.';return}
   const bw=WF.check($('ci-text').value);if(bw){err.textContent=wfMsg(bw,'Je review');$('ci-text').focus();return}
   const m=me(),before=levelsOf(reviewsOf(m));
-  const cats={};CATS.forEach(([k])=>cats[k]=+$('r-'+k).value);
+  const cats={};CATS.forEach(([k])=>cats[k]=$('ci-cats').checked?+$('r-'+k).value:stars);
   const tags=pickVal('ci-pick').slice(0,5);
   const plateRaw=$('ci-plate').value.trim(),f=$('ci-photo').files[0];
   if(plateRaw&&!normPlate(plateRaw)){err.textContent='Dit kenteken lijkt niet op een Nederlands kenteken. Controleer het of laat het veld leeg.';return}
@@ -4064,7 +4094,7 @@ function carPhotosHtml(c){
   const st=carPhotos[c.id],list=st?st.list:[],mine=myPhotosFor(c.id);
   const head=`<div class="sechead"><h3>Foto’s van rijders</h3><button class="ghost sm" data-act="photoadd" data-car="${esc(c.id)}">Foto insturen</button></div>`;
   const grid=list.length?`<div class="pgrid">${list.map(p=>`<figure class="pitem"><img src="${esc(p.img)}" alt="${esc(carName(c))}, foto van ${esc(p.user||'een rijder')}" loading="lazy"><figcaption><span>${esc(p.user||'')}</span>${OWNER?`<button class="plain" data-act="photodel" data-id="${esc(p._id)}" data-car="${esc(c.id)}" data-uid="${esc(p.uid||'')}">Verwijderen</button>`:''}</figcaption></figure>`).join('')}</div>`
-    :`<div class="empty">${st&&st.state==='loading'?'Foto’s laden…':'Nog geen foto’s van rijders. Stuur er een in: na een automatische controle en een keuring door het team verschijnt hij hier, met het kenteken onherkenbaar gemaakt.'}</div>`;
+    :`<div class="empty">${st&&st.state==='loading'?'Foto’s laden…':'Nog geen foto’s. Stuur de eerste in; het team keurt hem voordat hij zichtbaar wordt.'}</div>`;
   const pend=mine.length?`<p class="l" style="margin:4px 0 0">Jouw ingestuurde foto’s</p><div class="pgrid">${mine.map(p=>`<figure class="pitem ${p.status==='afgekeurd'?'rej':'pend'}">${photoSrcOk(p.img)?`<img src="${esc(p.img)}" alt="Jouw ingestuurde foto">`:''}<figcaption><b>${p.status==='afgekeurd'?'Afgekeurd':'Wacht op keuring'}</b>${p.status==='afgekeurd'&&p.reason?`<span>${esc(p.reason)}</span>`:''}${p.local?'<span>Alleen in deze browser</span>':''}</figcaption></figure>`).join('')}</div>`:'';
   return head+grid+pend;
 }
@@ -4216,6 +4246,7 @@ document.addEventListener('click',e=>{
   else if(a==='forgot')forgotPassword();
   else if(a==='reload')reloadAll();
   else if(a==='export')exportMyData(t);
+  else if(a==='badgesall'){showAllBadges=!showAllBadges;render()}
   else if(a==='showall'){view.showAll=true;$('results').innerHTML=renderResults()}
   else if(a==='editprofile2')openOnboarding('edit',2);
   else if(a==='gordreset')saveGarageOrder([]);
@@ -4775,9 +4806,9 @@ function findCars(q,limit){
 }
 function addCarFinder(p,onChange){
   const brand=$(p+'-brand');if(!brand||$(p+'-find'))return;
-  const row=brand.closest('.two')||brand.parentElement;
+  const row=brand.closest('details.manual')||brand.closest('.two')||brand.parentElement;
   const box=document.createElement('div');box.className='finder';
-  box.innerHTML=`<label class="l" for="${p}-find">Zoek je auto</label><input id="${p}-find" class="field" type="search" autocomplete="off" placeholder="Typ merk en model, bijvoorbeeld Golf of Ram 1500" aria-controls="${p}-findres" aria-autocomplete="list"><div class="hres finres" id="${p}-findres" role="listbox" hidden></div><p class="hint">Of kies hieronder merk en model uit de lijst.</p>`;
+  box.innerHTML=`<label class="l" for="${p}-find">Zoek je auto</label><input id="${p}-find" class="field" type="search" autocomplete="off" placeholder="Typ merk en model, bijvoorbeeld Golf of Ram 1500" aria-controls="${p}-findres" aria-autocomplete="list"><div class="hres finres" id="${p}-findres" role="listbox" hidden></div>`;
   row.parentElement.insertBefore(box,row);
   const inp=$(p+'-find'),res=$(p+'-findres');let list=[],act=-1;
   const show=()=>{
@@ -4925,6 +4956,21 @@ function discoverHtml(){
   if(!recent.length)h+=`<div class="empty">Er zijn nog geen auto’s beoordeeld. Zoek de auto die jij onlangs reed en wees de eerste.</div>`;
   h+=`<div class="allcars"><p>Zoek hierboven op merk of model, kies een merk, of bekijk alle ${CARS.length.toLocaleString('nl-NL')} modellen.</p><button class="ghost sm" data-act="showall">Alle modellen tonen</button></div>`;
   return h;
+}
+
+/* ---------- Badges op je eigen profiel: eerst wat je hebt en wat bijna lukt ---------- */
+let showAllBadges=false;
+function badgesSelfHtml(bs){
+  if(showAllBadges)return `<div class="badges">${bs.map(x=>badgeCard(x,true)).join('')}</div><button type="button" class="plain" data-act="badgesall">Minder badges tonen</button>`;
+  const earned=bs.filter(x=>x.lvl>0),open=bs.filter(x=>!x.lvl&&!x.b.hidden).sort((a,b)=>(b.val/(b.next||1))-(a.val/(a.next||1))).slice(0,3);
+  const hiddenLeft=bs.filter(x=>x.b.hidden&&!x.lvl).length;
+  return `<div class="badges">${earned.concat(open).map(x=>badgeCard(x,true)).join('')}</div>
+    <p class="explain" style="margin:0">${hiddenLeft?`Nog ${hiddenLeft} verborgen ${hiddenLeft===1?'badge':'badges'} te ontdekken. `:''}<button type="button" class="plain" data-act="badgesall">Alle ${bs.length} badges bekijken</button></p>`;
+}
+/* ---------- Check-in: per onderdeel beoordelen is optioneel ---------- */
+function catsMode(on){
+  const sl=$('sliders');if(!sl)return;sl.hidden=!on;
+  if(on&&stars)CATS.forEach(([k])=>{const r=form.querySelector(`input[name="rt-${k}"][value="${stars}"]`);if(r&&!sl.dataset.touched){r.checked=true;tireSync(k)}});
 }
 
 
