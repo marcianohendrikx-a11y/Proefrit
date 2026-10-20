@@ -489,6 +489,33 @@ textarea.field{min-height:96px;resize:vertical}
 .badge.secret strong{color:var(--muted)}
 .cta.danger{background:#c62828;color:#fff;border-color:#7f1515}
 .plain.delbtn{color:var(--muted);font-size:13px}
+.ticket.tcol{flex-direction:column;align-items:stretch;gap:8px}
+.treply{background:var(--bg);border-left:3px solid var(--accent);padding:8px 10px;border-radius:4px;font-size:14px;white-space:pre-wrap}
+.soc{grid-template-columns:1fr}
+.gbtn{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;height:44px;padding:0 16px;background:#fff;color:#1f1f1f;border:1px solid #747775;border-radius:999px;font:500 15px/1 Roboto,Arial,var(--body);letter-spacing:.01em;cursor:pointer}
+.gbtn svg{width:20px;height:20px;flex:none}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .gbtn{background:#131314;color:#e3e3e3;border-color:#8e918f}}
+:root[data-theme=dark] .gbtn{background:#131314;color:#e3e3e3;border-color:#8e918f}
+button,label.filebtn,.fchip span,.seg2 span{cursor:pointer}
+button:disabled{cursor:default}
+button,.carrow,.convo,.btile,.pill,.fbtn,.ghost,.cta,.more,.gbtn,.seg button,.bn,.acct,.sr,.fchip span,.seg2 span{transition:background-color .15s,border-color .15s,color .15s,box-shadow .15s,filter .15s,transform .15s}
+@media (hover:hover){
+.cta:not(:disabled):hover,.acct.out:hover{filter:brightness(1.07);box-shadow:0 3px 0 #15181d;transform:translateY(-1px)}
+.ghost:not(:disabled):hover,.more:hover,.fbtn:hover,.pill:not([aria-pressed=true]):hover,.btile:hover,.seg button:not([aria-pressed=true]):hover{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+.carrow:hover,.convo:hover,.gitem:hover{background:color-mix(in srgb,var(--accent) 5%,var(--surface));box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.bn:hover{color:var(--fg)}
+.bn.plus:hover svg,.bn.plus:hover i{filter:brightness(1.07)}
+.acct.in:hover{background:rgba(255,255,255,.2)}
+.plain:not(:disabled):hover,.back:hover{filter:brightness(1.25);text-decoration-thickness:2px}
+.x:hover{color:var(--fg)}
+.thumb:hover{border-color:var(--accent)}
+.av[data-act]:hover{box-shadow:0 0 0 2px var(--accent)}
+.fchip:hover span,.seg2 label:hover span{border-color:var(--accent)}
+.gbtn:hover{background:#f2f6fc;box-shadow:0 1px 3px rgba(60,64,67,.3)}
+:root[data-theme=dark] .gbtn:hover{background:#1f1f22}
+.cta.danger:not(:disabled):hover{box-shadow:0 3px 0 #7f1515}
+}
+@media (hover:hover) and (prefers-color-scheme:dark){:root:not([data-theme=light]) .gbtn:hover{background:#1f1f22}}
 </style>
 <header class="top gut">
   <div class="wrap topbar">
@@ -519,7 +546,7 @@ textarea.field{min-height:96px;resize:vertical}
     <div class="fh"><span class="lp"><i aria-hidden="true">NL</i><b>PROEFRIT</b></span><button type="button" class="x" data-act="closea" aria-label="Sluiten">×</button></div>
     <div><h2 id="authtitle">Log in bij Proefrit</h2><p class="sub" id="auth-reason" style="margin:0"></p></div>
     <div class="soc">
-      <button type="button" class="ghost" data-act="social" data-provider="Google">Doorgaan met Google</button>
+      <button type="button" class="gbtn" data-act="social" data-provider="Google"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Doorgaan met Google</span></button>
     </div>
     <p class="explain" id="soc-note" hidden></p>
     <div class="or">of met je e-mailadres</div>
@@ -3240,6 +3267,7 @@ function afterLogin(){
   if(!profileOf(me()).onboarded){openOnboarding('new',1,cb);return}
   const n=reqCount();
   if(cb)cb();else if(n)toast(`Je hebt ${n} chatverzoek${n>1?'en':''}. Open Chat om te reageren.`);
+  checkTicketReplies();
 }
 function logout(){view={...view,name:'feed',user:null,chat:null};window.scrollTo(0,0);signOut(false)}
 $('authform').addEventListener('submit',async e=>{
@@ -3788,13 +3816,13 @@ async function loadInbox(){
   if(!OWNER){inbox=null;return}
   try{
     const l=await rest('GET','tickets?select=*&order=created_at.desc&limit=300');
-    inbox=l.map(t=>({id:t.code,_doc:t.id,type:t.type,msg:t.message,email:t.reply_email||'',page:t.page||'',status:t.status,user:t.user_id?nameOf(t.user_id):'Gast',ts:Date.parse(t.created_at)}));
+    inbox=l.map(t=>({id:t.code,_doc:t.id,type:t.type,msg:t.message,email:t.reply_email||'',page:t.page||'',status:t.status,reply:t.reply||'',repliedAt:t.replied_at?Date.parse(t.replied_at):0,user:t.user_id?nameOf(t.user_id):'Gast',ts:Date.parse(t.created_at)}));
   }catch(e){inbox=null}
 }
 async function ownServerTickets(){
   const uid=sbUid();if(!uid)return [];
-  try{const l=await rest('GET','tickets?select=code,type,message,status,created_at&user_id=eq.'+uid+'&order=created_at.desc&limit=50');
-    return l.map(t=>({id:t.code,type:t.type,msg:t.message,status:t.status,user:me(),ts:Date.parse(t.created_at)}))}catch(e){return []}
+  try{const l=await rest('GET','tickets?select=code,type,message,status,created_at,reply,replied_at&user_id=eq.'+uid+'&order=created_at.desc&limit=50');
+    return l.map(t=>({id:t.code,type:t.type,msg:t.message,status:t.status,user:me(),ts:Date.parse(t.created_at),reply:t.reply||'',repliedAt:t.replied_at?Date.parse(t.replied_at):0}))}catch(e){return []}
 }
 async function sendTicket(t){
   const j=await fn('ticket',{type:t.type,message:t.msg,reply_email:t.email||null,page:t.page});
@@ -3810,7 +3838,14 @@ function viewLabel(){
   const n=view.name;
   return n==='feed'?'Feed':n==='zoek'?'Auto’s zoeken':n==='auto'&&view.car?carName(carById(view.car)):n==='chat'?'Chat':'Profiel';
 }
-const ticketRow=(t,owner)=>`<div class="ticket"><span><b>${esc(t.id)}</b> · ${esc(t.type)}${owner?` · van ${esc(t.user||'Gast')} · ${esc(t.page||'')}`:''}<br><small>${esc(owner?t.msg:(t.msg.length>90?t.msg.slice(0,90)+'…':t.msg))}</small>${owner&&t.email?`<br><small>Antwoord naar: ${esc(t.email)}</small>`:''}</span>
+const ticketRow=(t,owner)=>{
+  const head=`<b>${esc(t.id)}</b> · ${esc(t.type)} · <small>${esc(t.status||'Ontvangen')}</small>${t.ts?` · <small>${new Date(t.ts).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})}</small>`:''}`;
+  const rep=t.reply?`<div class="treply"><b>Antwoord van het team</b>${t.repliedAt?` <small>(${new Date(t.repliedAt).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})})</small>`:''}<br>${esc(t.reply)}</div>`:'';
+  if(!owner)return `<div class="ticket tcol"><span>${head}<br><small>${esc(t.msg)}</small></span>${rep||'<small class="meta">Nog geen antwoord.</small>'}</div>`;
+  return `<div class="ticket tcol"><span>${head}<br><small>van ${esc(t.user||'Gast')} · pagina: ${esc(t.page||'-')}${t.email?' · wil antwoord per e-mail':''}</small></span><p style="margin:0;white-space:pre-wrap">${esc(t.msg)}</p>${rep}
+    <label class="vh" for="tr-${esc(t._doc)}">Antwoord op ${esc(t.id)}</label><textarea id="tr-${esc(t._doc)}" class="field" rows="3" maxlength="2000" placeholder="${t.reply?'Nieuw antwoord (vervangt het vorige)':'Schrijf een antwoord. De melder ziet het in de app bij Jouw meldingen.'}"></textarea>
+    <div class="row" style="justify-content:space-between"><button type="button" class="ghost sm" data-act="treply" data-doc="${esc(t._doc)}">Antwoord versturen</button><button type="button" class="plain" data-act="tstatus" data-doc="${esc(t._doc)}" data-id="${esc(t.id)}" data-status="${t.status==='Afgehandeld'?'Ontvangen':'Afgehandeld'}">${t.status==='Afgehandeld'?'Heropenen':'Afhandelen zonder antwoord'}</button></div></div>`;
+};
   <span style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none"><small>${esc(t.status||'Ontvangen')}</small>${owner?`<button type="button" class="plain" data-act="tstatus" data-doc="${esc(t._doc)}" data-id="${esc(t.id)}" data-status="${t.status==='Afgehandeld'?'Ontvangen':'Afgehandeld'}">${t.status==='Afgehandeld'?'Heropenen':'Afhandelen'}</button>`:''}</span></div>`;
 async function renderTickets(){
   const who=me()||'Gast',el=$('fb-list');
@@ -3825,7 +3860,7 @@ async function renderTickets(){
 function openFeedback(){
   $('fbform').reset();$('fb-err').textContent='';
   $('fb-mail').value=me()?LV.email:'';
-  $('fb-where').textContent=true?'Je melding gaat als ticket naar het Proefrit-team, dat er direct een e-mail van krijgt. Vul je e-mailadres in als je antwoord wilt.':'Je melding wordt een ticket. Hier is geen verbinding met de inbox, dus het ticket blijft voorlopig in deze browser.';
+  $('fb-where').textContent=true?(me()?'Je melding gaat naar het Proefrit-team. Het antwoord zie je hier onder Jouw meldingen.':'Je melding gaat naar het Proefrit-team. Je hebt geen account, dus vul je e-mailadres in als je een antwoord wilt.'):'Je melding wordt een ticket. Hier is geen verbinding met de inbox, dus het ticket blijft voorlopig in deze browser.';
   if(!fdlg.open)fdlg.showModal();
   renderTickets();
   if(OWNER)loadInbox().then(renderTickets);
@@ -4148,6 +4183,13 @@ document.addEventListener('click',e=>{
   else if(a==='forgot')forgotPassword();
   else if(a==='reload')reloadAll();
   else if(a==='export')exportMyData(t);
+  else if(a==='treply'){
+    const doc=t.dataset.doc,ta=$('tr-'+doc),txt=ta?ta.value.trim():'';
+    if(txt.length<2){toast('Schrijf eerst een antwoord.');return}
+    t.disabled=true;
+    fn('ticket-reply',{id:doc,reply:txt}).then(async j=>{toast(j.emailed?'Antwoord verstuurd, ook per e-mail.':'Antwoord bewaard. De melder ziet het in de app bij Jouw meldingen.');await loadInbox();renderTickets();render()})
+      .catch(x=>{t.disabled=false;toast(x.message)});
+  }
   else if(a==='delrev'||a==='delcm'){
     if(t.dataset.sure!=='1'){t.dataset.sure='1';t.textContent='Echt verwijderen?';return}
     t.disabled=true;const id=t.dataset.id;
@@ -4625,7 +4667,7 @@ async function boot(){
   if(kind&&me()){afterLogin();return}
   if(me()){
     if(!profileOf(me()).onboarded)openOnboarding('new',1,null);
-    else{const n=reqCount();if(n)toast(`Je hebt ${n} chatverzoek${n>1?'en':''}. Open Chat om te reageren.`)}
+    else{const n=reqCount();if(n)toast(`Je hebt ${n} chatverzoek${n>1?'en':''}. Open Chat om te reageren.`);setTimeout(checkTicketReplies,n?6000:0)}
   }
 }
 
@@ -4664,6 +4706,16 @@ async function deleteAccount(confirmName){
   view={...view,name:'feed',user:null,chat:null};
   await reloadAll();window.scrollTo(0,0);
   toast('Je account en je gegevens zijn verwijderd.');
+}
+
+/* Melding beantwoord? Eén keer laten weten na het inloggen. */
+async function checkTicketReplies(){
+  const l=await ownServerTickets();let seen=[];
+  try{seen=JSON.parse(localStorage.getItem('proefrit-antwoorden-gezien')||'[]')}catch(e){}
+  const fresh=l.filter(t=>t.reply&&!seen.includes(t.id+'@'+t.repliedAt));
+  if(!fresh.length)return;
+  try{localStorage.setItem('proefrit-antwoorden-gezien',JSON.stringify(seen.concat(fresh.map(t=>t.id+'@'+t.repliedAt)).slice(-100)))}catch(e){}
+  toast(fresh.length>1?'Het team heeft je meldingen beantwoord. Bekijk ze via Opmerking over de website onderaan.':'Het team heeft je melding beantwoord. Bekijk het via Opmerking over de website onderaan.');
 }
 
 

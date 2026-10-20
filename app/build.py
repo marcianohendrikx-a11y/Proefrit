@@ -227,7 +227,7 @@ L = repfn(L, 'setTicketStatus', """async function setTicketStatus(doc,id,status)
 L = rep(L, "const a=me()?accountOf(me()):null;$('fb-mail').value=a?a.email:'';", "$('fb-mail').value=me()?LV.email:'';")
 L = rep(L, "$('fb-where').textContent=DB?", "$('fb-where').textContent=true?")
 L = rep(L, "'Je melding gaat als ticket naar een afgeschermde inbox die alleen het Proefrit-team kan lezen. In de echte app krijgt het team er ook direct een e-mail van.'",
-        "'Je melding gaat als ticket naar het Proefrit-team, dat er direct een e-mail van krijgt. Vul je e-mailadres in als je antwoord wilt.'")
+        "(me()?'Je melding gaat naar het Proefrit-team. Het antwoord zie je hier onder Jouw meldingen.':'Je melding gaat naar het Proefrit-team. Je hebt geen account, dus vul je e-mailadres in als je een antwoord wilt.')")
 L = rep(L, "  const where=await sendTicket(t);\n  if(btn)btn.disabled=false;\n  fdlg.close();\n  toast(where==='server'?`Ticket ${id} is verstuurd naar het Proefrit-team.`:`Ticket ${id} is in deze browser bewaard. Er was geen verbinding met de inbox.`);",
         "  try{await sendTicket(t)}catch(x){err.textContent=x.message;return}\n  finally{if(btn)btn.disabled=false}\n  fdlg.close();\n  toast(`Ticket ${t.id} is verstuurd naar het Proefrit-team.`);")
 L = rep(L, "<p class=\"explain\">Alleen jij als eigenaar van deze pagina ziet dit overzicht.</p>", "<p class=\"explain\">Alleen beheerders zien dit overzicht.</p>")
@@ -354,6 +354,33 @@ L = rep(L, "  else if(a==='export')exportMyData(t);", """  else if(a==='export')
     }).catch(x=>{t.disabled=false;toast(x.message)});
   }""")
 
+# ---------- Tickets beantwoorden in de app ----------
+_tr0 = L.index("const ticketRow=(t,owner)=>"); _tr1 = L.index("\n", _tr0)
+L = L[:_tr0] + r"""const ticketRow=(t,owner)=>{
+  const head=`<b>${esc(t.id)}</b> · ${esc(t.type)} · <small>${esc(t.status||'Ontvangen')}</small>${t.ts?` · <small>${new Date(t.ts).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})}</small>`:''}`;
+  const rep=t.reply?`<div class="treply"><b>Antwoord van het team</b>${t.repliedAt?` <small>(${new Date(t.repliedAt).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})})</small>`:''}<br>${esc(t.reply)}</div>`:'';
+  if(!owner)return `<div class="ticket tcol"><span>${head}<br><small>${esc(t.msg)}</small></span>${rep||'<small class="meta">Nog geen antwoord.</small>'}</div>`;
+  return `<div class="ticket tcol"><span>${head}<br><small>van ${esc(t.user||'Gast')} · pagina: ${esc(t.page||'-')}${t.email?' · wil antwoord per e-mail':''}</small></span><p style="margin:0;white-space:pre-wrap">${esc(t.msg)}</p>${rep}
+    <label class="vh" for="tr-${esc(t._doc)}">Antwoord op ${esc(t.id)}</label><textarea id="tr-${esc(t._doc)}" class="field" rows="3" maxlength="2000" placeholder="${t.reply?'Nieuw antwoord (vervangt het vorige)':'Schrijf een antwoord. De melder ziet het in de app bij Jouw meldingen.'}"></textarea>
+    <div class="row" style="justify-content:space-between"><button type="button" class="ghost sm" data-act="treply" data-doc="${esc(t._doc)}">Antwoord versturen</button><button type="button" class="plain" data-act="tstatus" data-doc="${esc(t._doc)}" data-id="${esc(t.id)}" data-status="${t.status==='Afgehandeld'?'Ontvangen':'Afgehandeld'}">${t.status==='Afgehandeld'?'Heropenen':'Afhandelen zonder antwoord'}</button></div></div>`;
+};""" + L[_tr1:]
+L = rep(L, "inbox=l.map(t=>({id:t.code,_doc:t.id,type:t.type,msg:t.message,email:t.reply_email||'',page:t.page||'',status:t.status,",
+        "inbox=l.map(t=>({id:t.code,_doc:t.id,type:t.type,msg:t.message,email:t.reply_email||'',page:t.page||'',status:t.status,reply:t.reply||'',repliedAt:t.replied_at?Date.parse(t.replied_at):0,")
+L = rep(L, "tickets?select=code,type,message,status,created_at&user_id=eq.",
+        "tickets?select=code,type,message,status,created_at,reply,replied_at&user_id=eq.")
+L = rep(L, "return l.map(t=>({id:t.code,type:t.type,msg:t.message,status:t.status,user:me(),ts:Date.parse(t.created_at)}))",
+        "return l.map(t=>({id:t.code,type:t.type,msg:t.message,status:t.status,user:me(),ts:Date.parse(t.created_at),reply:t.reply||'',repliedAt:t.replied_at?Date.parse(t.replied_at):0}))")
+L = rep(L, "  else if(a==='export')exportMyData(t);", """  else if(a==='export')exportMyData(t);
+  else if(a==='treply'){
+    const doc=t.dataset.doc,ta=$('tr-'+doc),txt=ta?ta.value.trim():'';
+    if(txt.length<2){toast('Schrijf eerst een antwoord.');return}
+    t.disabled=true;
+    fn('ticket-reply',{id:doc,reply:txt}).then(async j=>{toast(j.emailed?'Antwoord verstuurd, ook per e-mail.':'Antwoord bewaard. De melder ziet het in de app bij Jouw meldingen.');await loadInbox();renderTickets();render()})
+      .catch(x=>{t.disabled=false;toast(x.message)});
+  }""")
+L = rep(L, "  if(cb)cb();else if(n)toast(`Je hebt ${n} chatverzoek${n>1?'en':''}. Open Chat om te reageren.`);",
+        "  if(cb)cb();else if(n)toast(`Je hebt ${n} chatverzoek${n>1?'en':''}. Open Chat om te reageren.`);\n  checkTicketReplies();")
+
 # ---------- Start ----------
 s = L.index("/* ===== Start ===== */")
 L = L[:s] + core + "\n" + r"""
@@ -403,6 +430,7 @@ boot();
 # ---------- HTML ----------
 H = head
 H = rep(H, """      <button type="button" class="ghost" data-act="social" data-provider="Apple">Doorgaan met Apple</button>\n""", "")
+H = rep(H, '<button type="button" class="ghost" data-act="social" data-provider="Google">Doorgaan met Google</button>', '<button type="button" class="gbtn" data-act="social" data-provider="Google"><svg viewBox=\"0 0 48 48\" aria-hidden=\"true\"><path fill=\"#EA4335\" d=\"M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z\"/><path fill=\"#4285F4\" d=\"M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z\"/><path fill=\"#FBBC05\" d=\"M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z\"/><path fill=\"#34A853\" d=\"M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z\"/></svg><span>Doorgaan met Google</span></button>')
 H = rep(H, """<label class="l" for="a-login">Gebruikersnaam of e-mailadres</label><input id="a-login" class="field" autocomplete="username">""",
         """<label class="l" for="a-login">E-mailadres</label><input id="a-login" class="field" type="email" autocomplete="email">""")
 H = rep(H, """      <p class="err" id="a-err" role="alert"></p>\n      <button class="cta" id="authsubmit" type="submit">Inloggen</button>\n    </form>""",
@@ -410,7 +438,7 @@ H = rep(H, """      <p class="err" id="a-err" role="alert"></p>\n      <button c
 H = rep(H, """    <button class="plain" type="button" data-act="demo" style="align-self:flex-start">Of probeer het demo-account met voorbeeldritten</button>\n    <p class="explain">Dit is een prototype. Accounts, berichten en reacties blijven in deze browser en worden nergens heen gestuurd.</p>""",
         """    <button class="plain g-in" type="button" data-act="forgot" style="align-self:flex-start">Wachtwoord vergeten?</button>\n    <p class="explain">Je e-mailadres laten we nooit aan andere leden zien. Wat je deelt op je profiel, kies je zelf. Lees ook de <a href="privacy.html" target="_blank" rel="noopener">privacyverklaring</a>.</p>""")
 H = rep(H, '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap">', '<link rel="stylesheet" href="fonts/fonts.css">')
-H = rep(H, '</style>', '.cta.danger{background:#c62828;color:#fff;border-color:#7f1515}\n.plain.delbtn{color:var(--muted);font-size:13px}\n</style>')
+H = rep(H, '</style>', '.cta.danger{background:#c62828;color:#fff;border-color:#7f1515}\n.plain.delbtn{color:var(--muted);font-size:13px}\n.ticket.tcol{flex-direction:column;align-items:stretch;gap:8px}\n.treply{background:var(--bg);border-left:3px solid var(--accent);padding:8px 10px;border-radius:4px;font-size:14px;white-space:pre-wrap}\n.soc{grid-template-columns:1fr}\n.gbtn{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;height:44px;padding:0 16px;background:#fff;color:#1f1f1f;border:1px solid #747775;border-radius:999px;font:500 15px/1 Roboto,Arial,var(--body);letter-spacing:.01em;cursor:pointer}\n.gbtn svg{width:20px;height:20px;flex:none}\n@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .gbtn{background:#131314;color:#e3e3e3;border-color:#8e918f}}\n:root[data-theme=dark] .gbtn{background:#131314;color:#e3e3e3;border-color:#8e918f}\nbutton,label.filebtn,.fchip span,.seg2 span{cursor:pointer}\nbutton:disabled{cursor:default}\nbutton,.carrow,.convo,.btile,.pill,.fbtn,.ghost,.cta,.more,.gbtn,.seg button,.bn,.acct,.sr,.fchip span,.seg2 span{transition:background-color .15s,border-color .15s,color .15s,box-shadow .15s,filter .15s,transform .15s}\n@media (hover:hover){\n.cta:not(:disabled):hover,.acct.out:hover{filter:brightness(1.07);box-shadow:0 3px 0 #15181d;transform:translateY(-1px)}\n.ghost:not(:disabled):hover,.more:hover,.fbtn:hover,.pill:not([aria-pressed=true]):hover,.btile:hover,.seg button:not([aria-pressed=true]):hover{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--surface))}\n.carrow:hover,.convo:hover,.gitem:hover{background:color-mix(in srgb,var(--accent) 5%,var(--surface));box-shadow:0 2px 10px rgba(0,0,0,.08)}\n.bn:hover{color:var(--fg)}\n.bn.plus:hover svg,.bn.plus:hover i{filter:brightness(1.07)}\n.acct.in:hover{background:rgba(255,255,255,.2)}\n.plain:not(:disabled):hover,.back:hover{filter:brightness(1.25);text-decoration-thickness:2px}\n.x:hover{color:var(--fg)}\n.thumb:hover{border-color:var(--accent)}\n.av[data-act]:hover{box-shadow:0 0 0 2px var(--accent)}\n.fchip:hover span,.seg2 label:hover span{border-color:var(--accent)}\n.gbtn:hover{background:#f2f6fc;box-shadow:0 1px 3px rgba(60,64,67,.3)}\n:root[data-theme=dark] .gbtn:hover{background:#1f1f22}\n.cta.danger:not(:disabled):hover{box-shadow:0 3px 0 #7f1515}\n}\n@media (hover:hover) and (prefers-color-scheme:dark){:root:not([data-theme=light]) .gbtn:hover{background:#1f1f22}}\n</style>')
 H = rep(H, '<dialog id="cdlg"', '<dialog id="udlg" aria-labelledby="utitle"><div class="authbox" id="ubox"></div></dialog>\n<dialog id="cdlg"')
 FAV = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='2' y='14' width='60' height='36' rx='6' fill='%23f9c800' stroke='%2315181d' stroke-width='3'/%3E%3Crect x='5' y='17' width='11' height='30' rx='2' fill='%230b3f93'/%3E%3Ctext x='39' y='42' font-family='Arial' font-weight='700' font-size='26' text-anchor='middle' fill='%2315181d'%3EP%3C/text%3E%3C/svg%3E"
 H = ('<!doctype html>\n<html lang="nl">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'

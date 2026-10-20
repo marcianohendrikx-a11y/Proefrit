@@ -20,7 +20,10 @@ jobs:
         run: |
           set -euo pipefail
           psql "$DB" -v ON_ERROR_STOP=1 -q -c "create schema if not exists meta; create table if not exists meta.migrations (name text primary key, applied_at timestamptz not null default now()); revoke all on schema meta from public, anon, authenticated;"
-          psql "$DB" -v ON_ERROR_STOP=1 -q -c "insert into meta.migrations (name) values ('20261018000000_init.sql'), ('20261018000100_storage.sql') on conflict do nothing;"
+          # Alleen in het eerste project zijn de eerste twee bestanden met de hand uitgevoerd; in een nieuw, leeg project draait alles.
+          if [ "$(psql "$DB" -tA -c "select count(*) from meta.migrations")" = "0" ] && [ "$(psql "$DB" -tA -c "select to_regclass('public.profiles') is not null")" = "t" ]; then
+            psql "$DB" -v ON_ERROR_STOP=1 -q -c "insert into meta.migrations (name) values ('20261018000000_init.sql'), ('20261018000100_storage.sql') on conflict do nothing;"
+          fi
           for f in $(ls supabase/migrations/*.sql | sort); do
             n=$(basename "$f")
             done_already=$(psql "$DB" -tA -c "select count(*) from meta.migrations where name = '$n'")
@@ -31,3 +34,15 @@ jobs:
               echo "Al gedaan: $n"
             fi
           done
+      - name: Startgegevens (catalogus en woordenlijsten) als de database nog leeg is
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ "$(psql "$DB" -tA -c "select count(*) from public.cars")" = "0" ]; then
+            psql "$DB" -v ON_ERROR_STOP=1 -q -f supabase/seed/cars.sql
+            psql "$DB" -v ON_ERROR_STOP=1 -q -f supabase/seed/vocab.sql
+            echo "Startgegevens geladen"
+          else
+            echo "Catalogus staat er al"
+          fi

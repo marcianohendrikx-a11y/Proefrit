@@ -386,7 +386,7 @@ async function boot(){
   if(kind&&me()){afterLogin();return}
   if(me()){
     if(!profileOf(me()).onboarded)openOnboarding('new',1,null);
-    else{const n=reqCount();if(n)toast(`Je hebt ${n} chatverzoek${n>1?'en':''}. Open Chat om te reageren.`)}
+    else{const n=reqCount();if(n)toast(`Je hebt ${n} chatverzoek${n>1?'en':''}. Open Chat om te reageren.`);setTimeout(checkTicketReplies,n?6000:0)}
   }
 }
 
@@ -425,4 +425,14 @@ async function deleteAccount(confirmName){
   view={...view,name:'feed',user:null,chat:null};
   await reloadAll();window.scrollTo(0,0);
   toast('Je account en je gegevens zijn verwijderd.');
+}
+
+/* Melding beantwoord? Eén keer laten weten na het inloggen. */
+async function checkTicketReplies(){
+  const l=await ownServerTickets();let seen=[];
+  try{seen=JSON.parse(localStorage.getItem('proefrit-antwoorden-gezien')||'[]')}catch(e){}
+  const fresh=l.filter(t=>t.reply&&!seen.includes(t.id+'@'+t.repliedAt));
+  if(!fresh.length)return;
+  try{localStorage.setItem('proefrit-antwoorden-gezien',JSON.stringify(seen.concat(fresh.map(t=>t.id+'@'+t.repliedAt)).slice(-100)))}catch(e){}
+  toast(fresh.length>1?'Het team heeft je meldingen beantwoord. Bekijk ze via Opmerking over de website onderaan.':'Het team heeft je melding beantwoord. Bekijk het via Opmerking over de website onderaan.');
 }
