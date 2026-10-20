@@ -17,6 +17,7 @@ const NL_ERR=[
  [/rate limit|too many|over_email_send_rate_limit|email rate/i,'Er zijn net te veel pogingen gedaan. Probeer het over een paar minuten opnieuw.'],
  [/profiles_username_lower|profiles_username_key|duplicate key.*username/i,'Deze gebruikersnaam is al in gebruik. Kies een andere.'],
  [/conversations_pair|duplicate key.*conversations/i,'Er bestaat al een gesprek of verzoek met dit lid.'],
+ [/garage_items_uniek/i,'Deze auto staat al in die groep van je garage.'],
  [/likes_pkey/i,'Je gaf deze check-in al een Top!'],
  [/row-level security|permission denied|not allowed/i,'Dat mag niet met je account.'],
  [/jwt expired|invalid jwt|refresh token/i,'Je sessie is verlopen. Log opnieuw in.'],
@@ -466,7 +467,8 @@ function addCarFinder(p,onChange){
   const show=()=>{
     list=findCars(inp.value,8);act=list.length?0:-1;
     if(!inp.value.trim()){res.hidden=true;return}
-    res.innerHTML=list.length?list.map((c,i)=>`<button type="button" class="sr${i===act?' on':''}" role="option" data-find="${esc(c.id)}">${emblem(c.brand,'sm')}<span><b>${esc(carName(c))}</b><small>${years(c)} · ${BODY_NAME[bodyOf(c)]}</small></span></button>`).join(''):'<div class="none">Geen auto gevonden. Probeer een andere schrijfwijze, of kies hieronder uit de lijst.</div>';
+    const inG=id=>p==='ga'&&typeof ob!=='undefined'&&ob.draft&&ob.draft.garage.filter(g=>g.car===id).map(g=>GSTATUS[g.status]).join(', ');
+    res.innerHTML=list.length?list.map((c,i)=>{const g=inG(c.id);return `<button type="button" class="sr${i===act?' on':''}" role="option" data-find="${esc(c.id)}">${emblem(c.brand,'sm')}<span><b>${esc(carName(c))}</b><small>${years(c)} · ${BODY_NAME[bodyOf(c)]}${g?` · <span class="ing">al in je garage: ${esc(g.toLowerCase())}</span>`:''}</small></span></button>`}).join(''):'<div class="none">Geen auto gevonden. Probeer een andere schrijfwijze, of kies hieronder uit de lijst.</div>';
     res.hidden=false;
   };
   const pick=id=>{setPicker(p,id,'','');autoFilled[p]=null;inp.value='';res.hidden=true;onChange&&onChange();const f=$(p+'-fuel');if(f&&!f.value)f.focus()};

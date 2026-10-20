@@ -519,6 +519,7 @@ input[type=file]::file-selector-button:hover{border-color:var(--accent);color:va
 .cta.danger{background:#c62828;color:#fff;border-color:#7f1515}
 .plain.delbtn{color:var(--muted);font-size:13px}
 .finder{position:relative}
+.sr .ing{color:var(--good);font-weight:600}
 .startlist{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
 .startlist ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .startlist li{display:flex;align-items:center;gap:10px;font-size:15px}
@@ -3529,7 +3530,7 @@ async function garageAdd(){
   const d=ob.draft;
   if(d.garage.length>=12){err.textContent='Je garage zit vol (12 auto’s). Verwijder er eerst een.';return}
   if(status==='droom'&&d.garage.filter(g=>g.status==='droom').length>=4){err.textContent='Je kunt maximaal 4 droomauto’s kiezen. Verwijder er eerst een.';return}
-  if(d.garage.some(g=>g.car===car&&g.status===status&&g.fuel===fuel)){err.textContent='Deze auto staat al met deze status in je garage.';return}
+  {const have=d.garage.filter(g=>g.car===car),nm=carName(carById(car));if(have.some(g=>g.status===status)){err.textContent=`De ${nm} staat al bij ${GSTATUS[status]} in je garage.`;return}if(status==='droom'&&have.some(g=>g.status==='nu')){err.textContent=`Je rijdt de ${nm} al; die kan geen droomauto meer zijn.`;return}if(status==='nu'&&have.some(g=>g.status==='droom')){err.textContent=`De ${nm} staat bij je droomauto’s. Verwijder hem daar eerst, dan kun je hem bij Rijd ik nu zetten.`;return}}
   const ver=$('ga-ver').value,year=status==='droom'?'':$('ga-year').value,tags=status==='droom'?[]:pickVal('ga-pick');
   const raw=status==='nu'?$('ga-plate').value.trim():'';
   if(raw&&!normPlate(raw)){err.textContent='Dit kenteken lijkt niet op een Nederlands kenteken. Controleer het of laat het leeg.';return}
@@ -4365,6 +4366,7 @@ const NL_ERR=[
  [/rate limit|too many|over_email_send_rate_limit|email rate/i,'Er zijn net te veel pogingen gedaan. Probeer het over een paar minuten opnieuw.'],
  [/profiles_username_lower|profiles_username_key|duplicate key.*username/i,'Deze gebruikersnaam is al in gebruik. Kies een andere.'],
  [/conversations_pair|duplicate key.*conversations/i,'Er bestaat al een gesprek of verzoek met dit lid.'],
+ [/garage_items_uniek/i,'Deze auto staat al in die groep van je garage.'],
  [/likes_pkey/i,'Je gaf deze check-in al een Top!'],
  [/row-level security|permission denied|not allowed/i,'Dat mag niet met je account.'],
  [/jwt expired|invalid jwt|refresh token/i,'Je sessie is verlopen. Log opnieuw in.'],
@@ -4814,7 +4816,8 @@ function addCarFinder(p,onChange){
   const show=()=>{
     list=findCars(inp.value,8);act=list.length?0:-1;
     if(!inp.value.trim()){res.hidden=true;return}
-    res.innerHTML=list.length?list.map((c,i)=>`<button type="button" class="sr${i===act?' on':''}" role="option" data-find="${esc(c.id)}">${emblem(c.brand,'sm')}<span><b>${esc(carName(c))}</b><small>${years(c)} · ${BODY_NAME[bodyOf(c)]}</small></span></button>`).join(''):'<div class="none">Geen auto gevonden. Probeer een andere schrijfwijze, of kies hieronder uit de lijst.</div>';
+    const inG=id=>p==='ga'&&typeof ob!=='undefined'&&ob.draft&&ob.draft.garage.filter(g=>g.car===id).map(g=>GSTATUS[g.status]).join(', ');
+    res.innerHTML=list.length?list.map((c,i)=>{const g=inG(c.id);return `<button type="button" class="sr${i===act?' on':''}" role="option" data-find="${esc(c.id)}">${emblem(c.brand,'sm')}<span><b>${esc(carName(c))}</b><small>${years(c)} · ${BODY_NAME[bodyOf(c)]}${g?` · <span class="ing">al in je garage: ${esc(g.toLowerCase())}</span>`:''}</small></span></button>`}).join(''):'<div class="none">Geen auto gevonden. Probeer een andere schrijfwijze, of kies hieronder uit de lijst.</div>';
     res.hidden=false;
   };
   const pick=id=>{setPicker(p,id,'','');autoFilled[p]=null;inp.value='';res.hidden=true;onChange&&onChange();const f=$(p+'-fuel');if(f&&!f.value)f.focus()};
