@@ -172,6 +172,7 @@ L = L[:s] + r"""  const m=me(),before=levelsOf(reviewsOf(m));
   }catch(x){err.textContent=x.message;return}
   finally{btn.disabled=false;btn.textContent=label}
   const rev=mapReview(res.review);SEED.unshift(rev);
+  {const st=LV.stats[car]||(LV.stats[car]={n:0,avg:null,ver:0});st.avg=st.avg==null?rev.overall:(st.avg*st.n+rev.overall)/(st.n+1);st.n++}
   dlg.close();
   const after=levelsOf(reviewsOf(m)),gained=BADGES.filter(b=>after[b.id]>before[b.id]).map(b=>b.id);
   go('auto',{car,ver:'',onlyVer:false});
@@ -444,6 +445,12 @@ L = rep(L, "if(d.garage.some(g=>g.car===car&&g.status===status&&g.fuel===fuel)){
         "if(have.some(g=>g.status===status)){err.textContent=`De ${nm} staat al bij ${GSTATUS[status]} in je garage.`;return}"
         "if(status==='droom'&&have.some(g=>g.status==='nu')){err.textContent=`Je rijdt de ${nm} al; die kan geen droomauto meer zijn.`;return}"
         "if(status==='nu'&&have.some(g=>g.status==='droom')){err.textContent=`De ${nm} staat bij je droomauto’s. Verwijder hem daar eerst, dan kun je hem bij Rijd ik nu zetten.`;return}}")
+
+# ---------- Schaal: in delen laden ----------
+L = rep(L, "  l=l.map(c=>({c,s:agg(rv.filter(r=>r.car===c.id))}))", "  l=l.map(c=>({c,s:statOf(c.id)}))")
+L = rep(L, "function render(){\n", "function render(){\n  if(view.name==='auto'&&view.car)ensureCar(view.car);else if(view.name==='profiel'&&(view.user||me()))ensureUser(view.user||me());\n")
+L = rep(L, "(all().filter(r=>!view.feedVer||isVer(r)).map(reviewCard).join('')||", "(all().filter(r=>!view.feedVer||isVer(r)).map(reviewCard).join('')+(LV.more?'<button class=\"more\" data-act=\"feedmore\">Meer check-ins laden</button>':'')||")
+L = rep(L, "  else if(a==='export')exportMyData(t);", "  else if(a==='export')exportMyData(t);\n  else if(a==='feedmore')loadMoreFeed(t);")
 
 # ---------- Start ----------
 s = L.index("/* ===== Start ===== */")

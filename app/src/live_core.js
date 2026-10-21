@@ -136,40 +136,97 @@ async function loadExtraCars(){
   try{const v=$('ci-brand').value;fillBrands('ci');$('ci-brand').value=v}catch(e){}
 }
 
+/* De community wordt in delen geladen, zodat het ook met duizenden check-ins snel blijft:
+   - de feed per pagina (FEED_PAGE stuks, met "Meer check-ins laden"),
+   - alle check-ins en garages van een auto pas als je die auto opent,
+   - alle check-ins, garage en profielkaart van een lid pas als je dat profiel opent,
+   - aantallen en gemiddelden voor de zoeklijst in één keer uit de view car_stats. */
+const FEED_PAGE=40;
+LV.stats={};LV.carDone=new Set();LV.userDone=new Set();LV.carded=new Set();LV.more=false;LV.feedOldest=null;LV.loadingMore=false;
+const statOf=id=>LV.stats[id]||{n:0,avg:null,ver:0};
 async function loadCommunity(){
   const uid=sbUid();
-  const [names,cards,revs,garage]=await Promise.all([
+  const [names,revs,stats]=await Promise.all([
     restAll('profile_names?select=id,username,avatar_url&order=id'),
-    restAll('profile_cards?select=*&order=id'),
-    rest('GET','reviews?select=*&order=created_at.desc&limit=400'),
-    restAll('garage_items?select=*&order=created_at')
+    rest('GET',`reviews?select=*&order=created_at.desc&limit=${FEED_PAGE}`),
+    restAll('car_stats?select=*').catch(()=>[])
   ]);
   LV.ids={};LV.byName={};
   names.forEach(n=>{LV.ids[n.id]=n;LV.byName[n.username]=n});
-  const cardOf={};cards.forEach(c=>cardOf[c.id]=c);
+  LV.stats={};stats.forEach(x=>LV.stats[x.car_id]={n:+x.checkins,avg:x.weighted_avg==null?null:+x.weighted_avg,ver:+x.verified});
   store.accounts={};store.profiles={};
   names.forEach(n=>{
-    store.accounts[n.username.toLowerCase()]={name:n.username,id:n.id,since:sinceText(cardOf[n.id]&&cardOf[n.id].created_at)};
-    store.profiles[n.username]=cardOf[n.id]?profileFromCard(cardOf[n.id]):{avatar:n.avatar_url||'',profileVis:'members',onboarded:true,garage:[]};
+    store.accounts[n.username.toLowerCase()]={name:n.username,id:n.id,since:''};
+    store.profiles[n.username]={avatar:n.avatar_url||'',profileVis:'members',onboarded:true,garage:[]};
   });
   if(uid&&LV.myRow){
-    const p=profileFromRow(LV.myRow);store.profiles[LV.myRow.username]=p;
+    store.profiles[LV.myRow.username]=profileFromRow(LV.myRow);
     const a=store.accounts[LV.myRow.username.toLowerCase()];if(a)a.since=sinceText(LV.myRow.created_at);
   }
-  garage.forEach(g=>{const n=LV.ids[g.user_id];if(!n||!carById(g.car_id))return;const p=store.profiles[n.username];if(p)p.garage.push(mapGarage(g))});
-  Object.values(store.profiles).forEach(p=>{if(p.garage)p.garage.sort((a,b)=>a.pos-b.pos)});
-  const list=(revs||[]).filter(x=>carById(x.car_id)).map(mapReview);
+  SEED.length=0;store.liked={};store.mine=[];store.comments={};
+  LV.carDone.clear();LV.userDone.clear();LV.carded.clear();if(uid)LV.carded.add(uid);
+  await mergeReviews(revs||[]);
+  LV.more=(revs||[]).length===FEED_PAGE;LV.feedOldest=revs&&revs.length?revs[revs.length-1].created_at:null;
+  await loadCards(SEED.map(r=>r.uid).concat(SEED.flatMap(r=>r.comments.map(c=>c.uid))));
+}
+/* Nieuwe check-ins toevoegen (zonder dubbele), met hun Top!'s en reacties */
+async function mergeReviews(rows){
+  const have=new Set(SEED.map(r=>r.id)),uid=sbUid();
+  const list=rows.filter(x=>!have.has(x.id)&&carById(x.car_id)).map(mapReview);
+  if(!list.length)return [];
   const ids=list.map(r=>r.id);
-  const [likes,comments]=ids.length?await Promise.all([
+  const [likes,comments]=await Promise.all([
     restIn('likes','review_id,user_id','review_id',ids),
     restIn('comments','id,review_id,user_id,body,created_at','review_id',ids,'&order=created_at')
-  ]):[[],[]];
+  ]);
   const byId={};list.forEach(r=>byId[r.id]=r);
-  store.liked={};
   likes.forEach(l=>{const r=byId[l.review_id];if(!r)return;if(uid&&l.user_id===uid)store.liked[me()+':'+r.id]=true;else r.likes++});
   comments.forEach(c=>{const r=byId[c.review_id];if(r)r.comments.push(mapComment(c))});
-  SEED.length=0;SEED.push(...list);
-  store.mine=[];store.comments={};
+  SEED.push(...list);SEED.sort((a,b)=>b.ts-a.ts);
+  return list;
+}
+function mergeGarage(rows){
+  rows.forEach(g=>{const n=LV.ids[g.user_id];if(!n||!carById(g.car_id))return;const p=store.profiles[n.username];if(!p)return;
+    if(!p.garage.some(x=>x.id===g.id))p.garage.push(mapGarage(g))});
+  Object.values(store.profiles).forEach(p=>{if(p.garage)p.garage.sort((a,b)=>a.pos-b.pos)});
+}
+/* Profielkaarten (wat iemand zelf deelt) alleen voor leden die je ziet */
+async function loadCards(ids){
+  const need=[...new Set(ids)].filter(id=>id&&!LV.carded.has(id)&&LV.ids[id]);
+  if(!need.length)return;
+  need.forEach(id=>LV.carded.add(id));
+  const cards=await restIn('profile_cards','*','id',need).catch(()=>[]);
+  cards.forEach(c=>{const n=LV.ids[c.id];if(!n)return;const old=store.profiles[n.username]||{garage:[]};
+    store.profiles[n.username]={...profileFromCard(c),garage:old.garage||[]};
+    const a=store.accounts[n.username.toLowerCase()];if(a)a.since=sinceText(c.created_at)});
+}
+async function ensureCar(id){
+  if(!id||LV.carDone.has(id)||!LV.loaded)return;LV.carDone.add(id);
+  try{
+    const [revs,gar]=await Promise.all([rest('GET','reviews?select=*&car_id=eq.'+encodeURIComponent(id)+'&order=created_at.desc&limit=500'),rest('GET','garage_items?select=*&car_id=eq.'+encodeURIComponent(id)+'&limit=500')]);
+    const added=await mergeReviews(revs);mergeGarage(gar);
+    await loadCards(added.map(r=>r.uid).concat(gar.map(g=>g.user_id)));
+    if(added.length||gar.length){if(view.name==='auto'&&view.car===id)render()}
+  }catch(e){LV.carDone.delete(id)}
+}
+async function ensureUser(name){
+  const n=LV.byName[name];if(!n||LV.userDone.has(n.id)||!LV.loaded)return;LV.userDone.add(n.id);
+  try{
+    const [revs,gar]=await Promise.all([rest('GET','reviews?select=*&user_id=eq.'+n.id+'&order=created_at.desc&limit=1000'),rest('GET','garage_items?select=*&user_id=eq.'+n.id+'&order=position')]);
+    await mergeReviews(revs);mergeGarage(gar);await loadCards([n.id]);
+    if(view.name==='profiel'&&(view.user||me())===name)render();
+  }catch(e){LV.userDone.delete(n.id)}
+}
+async function loadMoreFeed(btn){
+  if(LV.loadingMore||!LV.more||!LV.feedOldest)return;LV.loadingMore=true;if(btn)btn.disabled=true;
+  try{
+    const revs=await rest('GET',`reviews?select=*&created_at=lt.${encodeURIComponent(LV.feedOldest)}&order=created_at.desc&limit=${FEED_PAGE}`);
+    const added=await mergeReviews(revs);
+    LV.more=revs.length===FEED_PAGE;LV.feedOldest=revs.length?revs[revs.length-1].created_at:LV.feedOldest;
+    await loadCards(added.map(r=>r.uid));
+    render();
+  }catch(e){toast('Laden lukte niet: '+e.message);if(btn)btn.disabled=false}
+  finally{LV.loadingMore=false}
 }
 
 async function loadMine(){
@@ -263,6 +320,7 @@ function sessionLost(){
 }
 async function reloadAll(){
   try{await loadCommunity();LV.loaded=true;LV.loadErr=''}catch(e){LV.loadErr=e.message;LV.loaded=true}
+  if(me())try{await ensureUser(me())}catch(e){}
   if(me())try{await loadChats()}catch(e){}
   if(OWNER){try{await loadInbox()}catch(e){}try{await loadModq()}catch(e){}}
   for(const k in carPhotos)delete carPhotos[k];myPhotoItems=null;
@@ -599,9 +657,8 @@ function startList(name){
 function discoverHtml(){
   const rv=all(),seen=new Set(),recent=[];
   rv.forEach(r=>{if(!seen.has(r.car)&&carById(r.car)){seen.add(r.car);recent.push(r.car)}});
-  const cnt={};rv.forEach(r=>cnt[r.car]=(cnt[r.car]||0)+1);
-  const most=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(x=>x[0]).filter(id=>carById(id)).slice(0,6);
-  const row=id=>{const c=carById(id),s=agg(rv.filter(r=>r.car===id));return `<button class="carrow" data-act="car" data-car="${esc(c.id)}">${emblem(c.brand)}
+  const most=Object.entries(LV.stats).sort((a,b)=>b[1].n-a[1].n).map(x=>x[0]).filter(id=>carById(id)).slice(0,6);
+  const row=id=>{const c=carById(id),s=statOf(id);return `<button class="carrow" data-act="car" data-car="${esc(c.id)}">${emblem(c.brand)}
     <span class="ct"><span class="t">${esc(carName(c))}</span><span class="m">${years(c)} · ${BODY_NAME[bodyOf(c)]}</span></span>
     <span class="r"><span class="n">${s.n} ${s.n===1?'check-in':'check-ins'}</span>${plate(s.avg)}</span></button>`};
   let h='';
