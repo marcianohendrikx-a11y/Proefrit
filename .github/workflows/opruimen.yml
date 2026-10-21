@@ -1,0 +1,28 @@
+# Elke maand oude gegevens opruimen, zoals de privacyverklaring belooft.
+# - Afgehandelde meldingen: 12 maanden na afhandeling (of na het insturen, als er geen antwoord is).
+# - Tellers van fotocontroles (alleen nodig voor de limiet per uur): na 30 dagen.
+name: Oude gegevens opruimen
+on:
+  schedule:
+    - cron: "41 4 3 * *"   # de 3e van elke maand, 04:41 UTC
+  workflow_dispatch:
+jobs:
+  opruimen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: psql installeren
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Opruimen
+        env:
+          DB: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          psql "$DB" -v ON_ERROR_STOP=1 -q <<'SQL'
+          with weg as (
+            delete from public.tickets
+            where status = 'Afgehandeld' and coalesce(replied_at, created_at) < now() - interval '12 months'
+            returning 1)
+          select count(*) as meldingen_verwijderd from weg;
+          with weg as (
+            delete from public.photo_attempts where created_at < now() - interval '30 days' returning 1)
+          select count(*) as fototellers_verwijderd from weg;
+          SQL
